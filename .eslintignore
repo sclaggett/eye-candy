@@ -1,5 +1,3 @@
-### The following ignore statements were part of the electron-react-boilerplate project
-
 # Logs
 logs
 *.log
@@ -47,31 +45,11 @@ main.js.map
 
 .idea
 npm-debug.log.*
+__snapshots__
+
+# Package.json
+package.json
+.travis.yml
 *.css.d.ts
 *.sass.d.ts
 *.scss.d.ts
-
-### Additional ignore statements from the old project
-
-# Logs
-npm-debug.log*
-
-# nyc test coverage
-.nyc_output
-
-.eslintcache
-
-# Dependency directories
-web/node_modules
-jspm_packages
-
-# Optional npm cache directory
-.npm
-
-# Optional REPL history
-.node_repl_history
-
-web/.psci_modules/
-web/bower_components/
-web/output/
-web/static/js/main.js
