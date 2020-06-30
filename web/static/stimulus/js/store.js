@@ -1,10 +1,10 @@
 /************************************************
 REDUX (GLOBAL STATE)
 ************************************************/
-import {SimpleIDB} from '/js/simpleIDB.js'
+import {SimpleIDB} from './simpleIDB.js'
 import {createStore, applyMiddleware} from '/js/redux.js'
-import {eyeCandyApp} from '/js/reducers.js'
-import * as actionsExports from '/js/actions.js';
+import {eyeCandyApp} from './reducers.js'
+import * as actionsExports from './actions.js';
 Object.entries(actionsExports).forEach(([name, exported]) => window[name] = exported);
 SimpleIDB.initialize()
 
@@ -327,7 +327,7 @@ async function preRenderWebWorkers(preRender, preRenderHash, renderPrefix) {
 let nProcs = navigator.hardwareConcurrency
 function initWebWorkers() {
     for (let n=0; n < nProcs; n++) {
-        webWorkers.push(new Worker('js/preRender.js', { type: "module" }))
+        webWorkers.push(new Worker('stimulus/js/preRender.js', { type: "module" }))
         webWorkers[n].onmessage = handleMsg
     }
 }

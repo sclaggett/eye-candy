@@ -1,4 +1,4 @@
-import {renderLoop} from "/js/render.js"
+import {renderLoop} from "./render.js"
 
 const loggerChannel = new BroadcastChannel('logger');
 

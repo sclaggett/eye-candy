@@ -1,4 +1,4 @@
-import { canvas, store } from "/js/store.js";
+import { canvas, store } from "./store.js";
 // TODO remove -- below is for debugging with test.js why the extra frame
 // sneaks in at begining of video if user doesn't save previous video
 // appears to not happen if just a SOLID stimuli as last frame in prev video

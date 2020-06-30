@@ -321,7 +321,7 @@ app.use(async (ctx, next) => {
             p => p.slice(-3)===".js"
         ).map(s => s.slice(0, -3))
     let videoChoices = fs.readdirSync(DATADIR+"videos/")
-    await ctx.render("index", {
+    await ctx.render("control", {
         programChoices,
         videoChoices
     });

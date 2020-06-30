@@ -1,7 +1,7 @@
 import { store, context, nextStimulus, loadImageForStimulus,
-    WIDTH, HEIGHT } from '/js/store.js'
+    WIDTH, HEIGHT } from './store.js'
 import { rgbToHex, colorToRGB, getDiagonalLength, cos,
-    sin, PI } from '/js/logic.js'
+    sin, PI } from './logic.js'
 
 function graphicsDispatcher() {
     const state = store.getState()

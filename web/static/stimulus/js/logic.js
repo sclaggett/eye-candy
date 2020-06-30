@@ -1,4 +1,4 @@
-import { store } from '/js/store.js'
+import { store } from './store.js'
 
 export const PI = Math.PI
 export const pow = Math.pow

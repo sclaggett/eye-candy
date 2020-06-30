@@ -1,5 +1,5 @@
-import {storeInitialState} from '/js/store.js'
-import { rgbToHex, cos, sin,  } from '/js/logic.js'
+import {storeInitialState} from './store.js'
+import { rgbToHex, cos, sin,  } from './logic.js'
 
 export function eyeCandyApp(state, action) {
     switch (action.type) {

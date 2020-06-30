@@ -1,8 +1,8 @@
-import { store, canvas, context, WIDTH, HEIGHT} from '/js/store.js'
+import { store, canvas, context, WIDTH, HEIGHT} from './store.js'
 import { canvasRecorder, registerFrame,
-         stopRecorder, startRecorder } from "/js/captureCanvas.js";
-import { tickDispatcher } from '/js/dispatchers.js'
-import { getDiagonalLength } from '/js/logic.js'
+         stopRecorder, startRecorder } from "./captureCanvas.js";
+import { tickDispatcher } from './dispatchers.js'
+import { getDiagonalLength } from './logic.js'
 
 export function renderBar(context, graphic) {
     // might need to translate first if rotation

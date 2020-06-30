@@ -1,4 +1,4 @@
-import {MersenneTwister} from '/js/mersenneTwister.js';
+import {MersenneTwister} from './mersenneTwister.js';
 const MT = MersenneTwister
 
 export class DeterministicRandom {

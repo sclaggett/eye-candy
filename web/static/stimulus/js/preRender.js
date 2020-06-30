@@ -1,5 +1,5 @@
-import {SimpleIDB} from '/js/simpleIDB.js';
-import {DeterministicRandom} from '/js/random.js';
+import {SimpleIDB} from './simpleIDB.js';
+import {DeterministicRandom} from './random.js';
 // note: cannot import store due to use of `window`
 // Dev note if updating: must cache invalidate for ctrl shift r on
 // http://localhost:3000/js/preRender.js 
