@@ -76,7 +76,7 @@ const createControlWindow = async () => {
           },
   });
 
-  controlWindow.loadURL(`file://${__dirname}/app.html`);
+  controlWindow.loadURL(`file://${__dirname}/../control/app.html`);
 
   // @TODO: Use "ready-to-show" event
   //        https://github.com/electron/electron/blob/master/docs/api/browser-window.md#using-ready-to-show-event
@@ -128,7 +128,7 @@ const createRenderWindow = async () => {
           },
   });
 
-  renderWindow.loadURL(`file://${__dirname}/app.html`);
+  renderWindow.loadURL(`file://${__dirname}/../render/app.html`);
 
   // @TODO: Use "ready-to-show" event
   //        https://github.com/electron/electron/blob/master/docs/api/browser-window.md#using-ready-to-show-event
@@ -160,6 +160,7 @@ const createRenderWindow = async () => {
 app.on('ready', () => {
   // TODO: Detect monitors
   createControlWindow();
+  createRenderWindow();
 });
 
 app.on('window-all-closed', () => {

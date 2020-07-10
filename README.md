@@ -29,3 +29,12 @@ Running production build locally:
 ```sh
 $ yarn start
 ```
+
+yarn dev:
+cross-env START_HOT=1 node -r @babel/register ./internals/scripts/CheckPortInUse.js && cross-env START_HOT=1 yarn start-renderer-dev
+
+yarn start-renderer-dev:
+cross-env NODE_ENV=development webpack-dev-server --config configs/webpack.config.renderer.dev.babel.js
+
+npm run start-main-dev:
+cross-env START_HOT=1 NODE_ENV=development electron -r ./internals/scripts/BabelRegister ./app/main/main.dev.ts
