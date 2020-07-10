@@ -1,28 +1,30 @@
 /* eslint global-require: off, no-console: off */
 
-/**
- * This module executes inside of electron's main process. You can start
- * electron renderer process from here and communicate with the other processes
- * through IPC.
+/*
+ * This module executes inside of electron's main process. This is where electron
+ * renderer process are launched and communicated with using IPC.
  *
- * When running `yarn build` or `yarn build-main`, this file is compiled to
- * `./app/main.prod.js` using webpack. This gives us some performance wins.
+ * Despite the "dev" in this file's name it's actually where the main process starts
+ * for both development and production. This file is compiled to "./app/main.prod.js"
+ * when "yarn build" or "yarn build-main" are run. This is done using webpack to give
+ * us some performance wins.
+ *
+ * Any log statements will be written to the terminal window.
  */
+
 import path from 'path';
 import { app, BrowserWindow } from 'electron';
-import { autoUpdater } from 'electron-updater';
-import log from 'electron-log';
 import MenuBuilder from './menu';
 
-export default class AppUpdater {
-  constructor() {
-    log.transports.file.level = 'info';
-    autoUpdater.logger = log;
-    autoUpdater.checkForUpdatesAndNotify();
-  }
-}
+let controlWindow: BrowserWindow | null = null;
+let renderWindow: BrowserWindow | null = null;
 
-let mainWindow: BrowserWindow | null = null;
+/*
+ * Install tools to aid in development and debugging. We use the "source-map-support"
+ * library in production to produce useful stack traces and the "electron-debug"
+ * library while debugging. Define a function that will be called by each render
+ * window to install development tools while debugging.
+ */
 
 if (process.env.NODE_ENV === 'production') {
   const sourceMapSupport = require('source-map-support');
@@ -46,7 +48,11 @@ const installExtensions = async () => {
   ).catch(console.log);
 };
 
-const createWindow = async () => {
+/*
+ * Define an asychronous function that creates the main control window.
+ */
+
+const createControlWindow = async () => {
   if (
     process.env.NODE_ENV === 'development' ||
     process.env.DEBUG_PROD === 'true'
@@ -54,7 +60,7 @@ const createWindow = async () => {
     await installExtensions();
   }
 
-  mainWindow = new BrowserWindow({
+  controlWindow = new BrowserWindow({
     show: false,
     width: 1024,
     height: 728,
@@ -70,37 +76,91 @@ const createWindow = async () => {
           },
   });
 
-  mainWindow.loadURL(`file://${__dirname}/app.html`);
+  controlWindow.loadURL(`file://${__dirname}/app.html`);
 
-  // @TODO: Use 'ready-to-show' event
+  // @TODO: Use "ready-to-show" event
   //        https://github.com/electron/electron/blob/master/docs/api/browser-window.md#using-ready-to-show-event
-  mainWindow.webContents.on('did-finish-load', () => {
-    if (!mainWindow) {
-      throw new Error('"mainWindow" is not defined');
+  controlWindow.webContents.on('did-finish-load', () => {
+    if (!controlWindow) {
+      throw new Error('controlWindow is not defined');
     }
     if (process.env.START_MINIMIZED) {
-      mainWindow.minimize();
+      controlWindow.minimize();
     } else {
-      mainWindow.show();
-      mainWindow.focus();
+      controlWindow.show();
+      controlWindow.focus();
     }
   });
 
-  mainWindow.on('closed', () => {
-    mainWindow = null;
+  controlWindow.on('closed', () => {
+    controlWindow = null;
   });
 
-  const menuBuilder = new MenuBuilder(mainWindow);
+  const menuBuilder = new MenuBuilder(controlWindow);
   menuBuilder.buildMenu();
+};
 
-  // Remove this if your app does not use auto updates
-  // eslint-disable-next-line
-  new AppUpdater();
+/*
+ * Define an asychronous function that creates the offscreen render window.
+ */
+
+const createRenderWindow = async () => {
+  if (
+    process.env.NODE_ENV === 'development' ||
+    process.env.DEBUG_PROD === 'true'
+  ) {
+    await installExtensions();
+  }
+
+  renderWindow = new BrowserWindow({
+    show: false,
+    width: 1024,
+    height: 728,
+    webPreferences:
+      (process.env.NODE_ENV === 'development' ||
+        process.env.E2E_BUILD === 'true') &&
+      process.env.ERB_SECURE !== 'true'
+        ? {
+            nodeIntegration: true,
+          }
+        : {
+            preload: path.join(__dirname, 'dist/renderer.prod.js'),
+          },
+  });
+
+  renderWindow.loadURL(`file://${__dirname}/app.html`);
+
+  // @TODO: Use "ready-to-show" event
+  //        https://github.com/electron/electron/blob/master/docs/api/browser-window.md#using-ready-to-show-event
+  renderWindow.webContents.on('did-finish-load', () => {
+    if (!renderWindow) {
+      throw new Error('renderWindow is not defined');
+    }
+    if (process.env.START_MINIMIZED) {
+      renderWindow.minimize();
+    } else {
+      renderWindow.show();
+      renderWindow.focus();
+    }
+  });
+
+  renderWindow.on('closed', () => {
+    renderWindow = null;
+  });
+
+  const menuBuilder = new MenuBuilder(renderWindow);
+  menuBuilder.buildMenu();
 };
 
 /**
- * Add event listeners...
+ * The starting point for an electron application is when the "ready" event is
+ * emitted by the framework.
  */
+
+app.on('ready', () => {
+  // TODO: Detect monitors
+  createControlWindow();
+});
 
 app.on('window-all-closed', () => {
   // Respect the OSX convention of having the application in memory even
@@ -110,10 +170,13 @@ app.on('window-all-closed', () => {
   }
 });
 
-app.on('ready', createWindow);
-
 app.on('activate', () => {
   // On macOS it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
-  if (mainWindow === null) createWindow();
+  if (controlWindow === null) {
+    createControlWindow();
+  }
+  if (renderWindow === null) {
+    createRenderWindow();
+  }
 });

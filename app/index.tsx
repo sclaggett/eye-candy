@@ -5,6 +5,9 @@ import Root from './containers/Root';
 import { history, configuredStore } from './store';
 import './app.global.css';
 
+// This where the render process starts. Logs will be written to the embedded browser console
+console.log('## index.tsx');
+
 const store = configuredStore();
 
 const AppContainer = process.env.PLAIN_HMR ? Fragment : ReactHotAppContainer;
