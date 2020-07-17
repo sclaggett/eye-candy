@@ -55,10 +55,11 @@
     "files": [
       "dist/",
       "node_modules/",
-      "app.html",
-      "main.prod.js",
-      "main.prod.js.map",
-      "package.json"
+      "package.json",
+      "main/main.prod.js",
+      "main/main.prod.js.map",
+      "control/app.html",
+      "stimulus/app.html"
     ],
     "dmg": {
       "contents": [
