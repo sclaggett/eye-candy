@@ -2,8 +2,8 @@ import React, { Fragment } from 'react';
 import { render } from 'react-dom';
 import { AppContainer as ReactHotAppContainer } from 'react-hot-loader';
 import Root from './containers/Root';
-import { history, configuredStore } from './store';
-import './global.css';
+import { history, configuredStore } from './Store';
+import './Global.css';
 
 document.addEventListener('DOMContentLoaded', () => {
   /**

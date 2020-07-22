@@ -76,7 +76,7 @@ const createControlWindow = async () => {
           },
   });
 
-  controlWindow.loadURL(`file://${__dirname}/../control/control.html`);
+  controlWindow.loadURL(`file://${__dirname}/../control/Control.html`);
 
   // @TODO: Use "ready-to-show" event
   //        https://github.com/electron/electron/blob/master/docs/api/browser-window.md#using-ready-to-show-event

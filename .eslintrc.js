@@ -3,6 +3,11 @@ module.exports = {
   rules: {
     // A temporary hack related to IDE not resolving correct package.json
     'import/no-extraneous-dependencies': 'off',
+
+    // I declare the following corrections to the ESLint config to be the one
+    // true way to write code
+    'react/destructuring-assignment': 'off',
+    'class-methods-use-this': 'off',
   },
   parserOptions: {
     ecmaVersion: 2020,

@@ -29,3 +29,8 @@ Running production build locally:
 ```sh
 $ yarn start
 ```
+
+```sh
+$ cd eye-candy/old
+$ rsync -c -rlgoz . {user@host}:~/eye-candy
+```
