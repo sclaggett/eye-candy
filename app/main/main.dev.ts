@@ -16,6 +16,8 @@ import path from 'path';
 import { app, BrowserWindow } from 'electron';
 import MenuBuilder from './menu';
 
+const ipc = require('electron').ipcMain;
+
 let controlWindow: BrowserWindow | null = null;
 let stimulusWindow: BrowserWindow | null = null;
 
@@ -62,8 +64,8 @@ const createControlWindow = async () => {
 
   controlWindow = new BrowserWindow({
     show: false,
-    width: 800,
-    height: 900,
+    width: 1150,
+    height: 850,
     webPreferences:
       (process.env.NODE_ENV === 'development' ||
         process.env.E2E_BUILD === 'true') &&
@@ -160,9 +162,6 @@ const createStimulusWindow = async () => {
 app.on('ready', () => {
   // TODO: Detect monitors before creating the control window
   createControlWindow();
-
-  // This will go later as we're preparing to run the program
-  // createStimulusWindow();
 });
 
 /**
@@ -182,4 +181,9 @@ app.on('activate', () => {
   if (controlWindow === null) {
     createControlWindow();
   }
+});
+
+// Temp
+ipc.on('test-ipc', function () {
+  createStimulusWindow();
 });

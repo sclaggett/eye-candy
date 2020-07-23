@@ -1,6 +1,7 @@
 import React from 'react';
 import styles from './Control.css';
 
+const ipc = require('electron').ipcRenderer;
 const fs = require('fs');
 
 export default class Control extends React.Component {
@@ -71,6 +72,7 @@ export default class Control extends React.Component {
   }
 
   onLoadClick() {
+    ipc.send('test-ipc');
     // console.log('## onLoadClick()');
   }
 
