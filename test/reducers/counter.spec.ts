@@ -2,7 +2,7 @@ import { AnyAction } from 'redux';
 import counterReducer, {
   increment,
   decrement,
-} from '../../app/features/counter/counterSlice';
+} from '../../app/stimulus/features/counter/counterSlice';
 
 describe('reducers', () => {
   describe('counter', () => {

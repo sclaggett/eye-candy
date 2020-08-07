@@ -184,6 +184,6 @@ app.on('activate', () => {
 });
 
 // Temp
-ipc.on('test-ipc', function () {
+ipc.on('test-ipc', () => {
   createStimulusWindow();
 });

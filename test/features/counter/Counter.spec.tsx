@@ -6,8 +6,8 @@ import { BrowserRouter as Router } from 'react-router-dom';
 import renderer from 'react-test-renderer';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
-import Counter from '../../../app/features/counter/Counter';
-import * as counterSlice from '../../../app/features/counter/counterSlice';
+import Counter from '../../../app/stimulus/features/counter/Counter';
+import * as counterSlice from '../../../app/stimulus/features/counter/counterSlice';
 
 Enzyme.configure({ adapter: new Adapter() });
 jest.useFakeTimers();
