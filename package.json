@@ -98,7 +98,16 @@
     "type": "git",
     "url": "git+https://github.com/sclaggett/eye-candy.git"
   },
-  "author": "Tyler Benster",
+  "author": {
+    "name": "Tyler Benster",
+    "email": "no@email.com"
+  },
+  "contributors": [
+    {
+      "name": "Shane Claggett",
+      "email": "no@email.com"
+    }
+  ],
   "license": "UNLICENSED",
   "bugs": {
     "url": "https://github.com/sclaggett/eye-candy/issues"

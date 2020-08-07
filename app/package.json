@@ -3,7 +3,16 @@
   "version": "0.3.3",
   "description": "Eye Candy stimulus generator",
   "main": "./main/main.prod.js",
-  "author": "Tyler Benster",
+  "author": {
+    "name": "Tyler Benster",
+    "email": "no@email.com"
+  },
+  "contributors": [
+    {
+      "name": "Shane Claggett",
+      "email": "no@email.com"
+    }
+  ],
   "license": "UNLICENSED",
   "repository": {
     "type": "git",
