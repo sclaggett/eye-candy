@@ -2,7 +2,9 @@
 
 **Note.** This project is currently in a state of flux while it is being ported to the Electron framework. The [old project](old/README.md) is still around and can be found in the `old` folder.
 
-All frameworks used here are under the permissive MIT license: Electron, Electron React Boilerplate, React, Redux, React Router, Webpack, and React Hot Loader.
+**Licenses.** This project is proprietary (unlicensed) and owned by the University of Washington.
+
+All frameworks used here are released under the permissive MIT license: Electron, Electron React Boilerplate, React, Redux, React Router, Webpack, and React Hot Loader.
 
 ## Data types
 
