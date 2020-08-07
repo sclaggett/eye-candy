@@ -173,6 +173,11 @@ export default merge.smart(baseConfig, {
         test: /\.(?:ico|gif|png|jpg|jpeg|webp)$/,
         use: 'url-loader',
       },
+      // HTML files
+      {
+        test: /\.html(\?v=\d+\.\d+\.\d+)?$/,
+        use: 'file-loader',
+      },
     ],
   },
 

@@ -14,7 +14,11 @@
 
 import path from 'path';
 import { app, BrowserWindow } from 'electron';
+import url from 'url';
 import MenuBuilder from './menu';
+
+import controlHtml from '../control/Control.html';
+import stimulusHtml from '../stimulus/stimulus.html';
 
 const ipc = require('electron').ipcMain;
 
@@ -78,7 +82,12 @@ const createControlWindow = async () => {
           },
   });
 
-  controlWindow.loadURL(`file://${__dirname}/../control/Control.html`);
+  const controlUrl: string = url.format({
+    pathname: path.join(__dirname, '../control/Control.html'),
+    protocol: 'file:',
+    slashes: true,
+  });
+  controlWindow.loadURL(controlUrl);
 
   // @TODO: Use "ready-to-show" event
   //        https://github.com/electron/electron/blob/master/docs/api/browser-window.md#using-ready-to-show-event
@@ -134,7 +143,13 @@ const createStimulusWindow = async () => {
           },
   });
 
-  stimulusWindow.loadURL(`file://${__dirname}/../stimulus/stimulus.html`);
+  stimulusWindow.loadURL(
+    url.format({
+      pathname: path.join(__dirname, '../stimulus/stimulus.html'),
+      protocol: 'file:',
+      slashes: true,
+    })
+  );
 
   // @TODO: Use "ready-to-show" event
   //        https://github.com/electron/electron/blob/master/docs/api/browser-window.md#using-ready-to-show-event
