@@ -79,10 +79,8 @@ const createControlWindow = async () => {
           },
   });
 
-  // pathname: path.join(__dirname, '../control/Control.html'),
-
   const controlUrl: string = url.format({
-    pathname: path.join(__dirname, '../stimulus/stimulus.html'),
+    pathname: path.join(__dirname, '../control/Control.html'),
     protocol: 'file:',
     slashes: true,
   });
