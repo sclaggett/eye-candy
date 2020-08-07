@@ -83,12 +83,13 @@ const createControlWindow = async () => {
   // @TODO: Use "ready-to-show" event
   //        https://github.com/electron/electron/blob/master/docs/api/browser-window.md#using-ready-to-show-event
   controlWindow.webContents.on('did-finish-load', () => {
-    // Hack while debugging production issue
-    controlWindow.webContents.openDevTools();
-
     if (!controlWindow) {
       throw new Error('controlWindow is not defined');
     }
+
+    // Hack while debugging production issue
+    controlWindow.webContents.openDevTools();
+
     if (process.env.START_MINIMIZED) {
       controlWindow.minimize();
     } else {
