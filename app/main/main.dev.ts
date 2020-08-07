@@ -17,9 +17,6 @@ import { app, BrowserWindow } from 'electron';
 import url from 'url';
 import MenuBuilder from './menu';
 
-// import controlHtml from '../control/Control.html';
-// import stimulusHtml from '../stimulus/stimulus.html';
-
 const ipc = require('electron').ipcMain;
 
 let controlWindow: BrowserWindow | null = null;
@@ -82,8 +79,10 @@ const createControlWindow = async () => {
           },
   });
 
+  // pathname: path.join(__dirname, '../control/Control.html'),
+
   const controlUrl: string = url.format({
-    pathname: path.join(__dirname, '../control/Control.html'),
+    pathname: path.join(__dirname, '../stimulus/stimulus.html'),
     protocol: 'file:',
     slashes: true,
   });
