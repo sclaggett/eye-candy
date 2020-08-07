@@ -24,7 +24,7 @@ export default merge.smart(baseConfig, {
   target: 'electron-preload',
 
   entry: [
-    path.join(__dirname, '..', 'app/control/control.tsx'),
+    path.join(__dirname, '..', 'app/control/Control.tsx'),
     path.join(__dirname, '..', 'app/stimulus/stimulus.tsx'),
   ],
 
