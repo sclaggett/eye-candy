@@ -96,14 +96,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tbenst/eye-candy.git"
+    "url": "git+https://github.com/sclaggett/eye-candy.git"
   },
   "author": "Tyler Benster",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/tbenst/eye-candy/issues"
+    "url": "https://github.com/sclaggett/eye-candy/issues"
   },
-  "homepage": "https://github.com/tbenst/eye-candy#readme",
+  "homepage": "https://github.com/sclaggett/eye-candy#readme",
   "jest": {
     "testURL": "http://localhost/",
     "moduleNameMapper": {

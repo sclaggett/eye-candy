@@ -4,7 +4,8 @@
 
 All frameworks used here are under the permissive MIT license: Electron, Electron React Boilerplate, React, Redux, React Router, Webpack, and React Hot Loader.
 
-        os: [macos-10.14, windows-2019, ubuntu-18.04]
+test.yml all types:
+os: [macos-10.14, windows-2019, ubuntu-18.04]
 
 ## Data types
 
