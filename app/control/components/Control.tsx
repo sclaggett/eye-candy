@@ -1,11 +1,51 @@
 import React from 'react';
-import styles from './Control.css';
+import * as styles from './Control.css';
 
 const ipc = require('electron').ipcRenderer;
 const fs = require('fs');
 
-export default class Control extends React.Component {
-  constructor(props) {
+type ControlProps = {
+  dummy: string;
+};
+
+type ControlState = {
+  studyAffiliation: string;
+  studyLab: string;
+  studyPeople: string;
+  studyPurpose: string;
+  animalNumber: number;
+  animalSpecies: string;
+  animalType: string;
+  animalDOB: string;
+  animalSex: string;
+  retinaEye: string;
+  retinaLocation: string;
+  retinaOrientation: number;
+  retinaDissection: string;
+  retinaSolution: string;
+  retinaWeight: string;
+  meaType: string;
+  meaTemperature: string;
+  perfusionTemperature: string;
+  perfusionFlowRate: string;
+  pinHole: string;
+  displayMode: string;
+  experimentNumber: string;
+  experimentFilename: string;
+  experimentSeed: string;
+  programs: string[];
+  selectedProgram: string;
+  startDisabled: boolean;
+  previewDisabled: boolean;
+  estimateDisabled: boolean;
+  saveDisabled: boolean;
+};
+
+export default class Control extends React.Component<
+  ControlProps,
+  ControlState
+> {
+  constructor(props: ControlProps) {
     super(props);
     this.state = {
       studyAffiliation: 'University of Washington Medicine',
@@ -48,8 +88,12 @@ export default class Control extends React.Component {
    * as options in the drop down list below.
    */
   componentDidMount() {
-    fs.readdir('./resources/programs', (err, dir) => {
-      const programs = [];
+    fs.readdir('./resources/programs', (err: Error, dir: string[]) => {
+      if (err) {
+        // console.log(`Failed to read programs directory: ${err}`);
+        return;
+      }
+      const programs: string[] = [];
       for (let i = 0; i < dir.length; i += 1) {
         programs.push(dir[i]);
       }
@@ -65,10 +109,20 @@ export default class Control extends React.Component {
    * Define a generic handler that works by virtue of the fact that the input element names
    * match state field names.
    */
-  onInputChange(event) {
-    this.setState({
-      [event.target.name]: event.target.value,
-    });
+  onInputChange(event: React.ChangeEvent<HTMLInputElement>) {
+    if (event.target && event.target.name && event.target.value) {
+      this.setState(({
+        [event.target.name]: event.target.value,
+      } as unknown) as ControlState);
+    }
+  }
+
+  onSelectChange(event: React.ChangeEvent<HTMLSelectElement>) {
+    if (event.target && event.target.name && event.target.value) {
+      this.setState(({
+        [event.target.name]: event.target.value,
+      } as unknown) as ControlState);
+    }
   }
 
   onLoadClick() {
@@ -397,7 +451,7 @@ export default class Control extends React.Component {
                     className={styles.input}
                     name="selectedProgram"
                     value={this.state.selectedProgram}
-                    onChange={this.onInputChange.bind(this)}
+                    onChange={this.onSelectChange.bind(this)}
                   >
                     {this.state.programs.map((program) => (
                       <option key={program} value={program}>

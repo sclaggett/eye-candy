@@ -8,6 +8,7 @@ module.exports = {
     // true way to write code
     'react/destructuring-assignment': 'off',
     'class-methods-use-this': 'off',
+    '@typescript-eslint/no-empty-interface': 0,
   },
   parserOptions: {
     ecmaVersion: 2020,
