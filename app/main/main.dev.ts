@@ -17,8 +17,8 @@ import { app, BrowserWindow } from 'electron';
 import url from 'url';
 import MenuBuilder from './menu';
 
-import controlHtml from '../control/Control.html';
-import stimulusHtml from '../stimulus/stimulus.html';
+// import controlHtml from '../control/Control.html';
+// import stimulusHtml from '../stimulus/stimulus.html';
 
 const ipc = require('electron').ipcMain;
 
