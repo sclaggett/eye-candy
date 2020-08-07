@@ -28,6 +28,25 @@ These can be further divided into two categories:
    c. Custom sequences
    d. Experiments
 
+## File system
+
+The user specifies a root folder where all Eye Candy data will be stored:
+
+root = /home/sclaggett/eyecandy
+
+All experiments for a given day will be stored in a single directory along with the data captured by the MEA system:
+
+${root}/2020-08-04/Experiment1.txt
+  ${root}/2020-08-04/Experiment2.txt
+${root}/2020-08-04/Experiment3.txt
+  ${root}/2020-08-04/[MEA files]
+
+Studies and custom programs and sequences are stored by name in the following subdirectories:
+
+${root}/studies/${study name}.txt
+${root}/programs/${program name}.txt
+${root}/sequences/${sequence name}.txt
+
 ## Type parameters
 
 Each data type listed above has an array of key-value pairs associated with it. Each of these values is of a specific type, can be set by the user, may have a default, and may be limited to certain options. The supported value types are:
@@ -136,25 +155,6 @@ Example:
 - Key: Perfusion temperature; type: number
 - Key: Perfusion flow rate; type: number
 - Key: Pinhole (0-1); type: number
-
-## File system
-
-The user specifies a root folder where all Eye Candy data will be stored:
-
-root = /home/sclaggett/eyecandy
-
-All experiments for a given day will be stored in a single directory along with the data captured by the MEA system:
-
-${root}/2020-08-04/Experiment1.txt
-  ${root}/2020-08-04/Experiment2.txt
-${root}/2020-08-04/Experiment3.txt
-  ${root}/2020-08-04/[MEA files]
-
-Studies and custom programs and sequences are stored by name in the following subdirectories:
-
-${root}/studies/${study name}.txt
-${root}/programs/${program name}.txt
-${root}/sequences/${sequence name}.txt
 
 The new project is based on the [electron-react-boilerplate](https://electron-react-boilerplate.js.org/) repository which combines the [Electron](https://electron.atom.io/), [React](https://facebook.github.io/react/), [Redux](https://github.com/reactjs/redux), [React Router](https://github.com/reactjs/react-router), [Webpack](https://webpack.github.io/docs/) and [React Hot Loader](https://github.com/gaearon/react-hot-loader) frameworks into a single cross-platform desktop application.
 

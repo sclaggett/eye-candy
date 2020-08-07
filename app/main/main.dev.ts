@@ -75,7 +75,6 @@ const createControlWindow = async () => {
           }
         : {
             preload: path.join(__dirname, '../dist/renderer.prod.js'),
-            webSecurity: false,
           },
   });
 
@@ -132,7 +131,6 @@ const createStimulusWindow = async () => {
           }
         : {
             preload: path.join(__dirname, '../dist/renderer.prod.js'),
-            webSecurity: false,
           },
   });
 

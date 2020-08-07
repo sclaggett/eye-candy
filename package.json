@@ -58,8 +58,8 @@
       "package.json",
       "main/main.prod.js",
       "main/main.prod.js.map",
-      "control/app.html",
-      "stimulus/app.html"
+      "control/Control.html",
+      "stimulus/Stimulus.html"
     ],
     "dmg": {
       "contents": [
