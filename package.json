@@ -59,7 +59,7 @@
       "main/main.prod.js",
       "main/main.prod.js.map",
       "control/Control.html",
-      "stimulus/Stimulus.html"
+      "stimulus/stimulus.html"
     ],
     "dmg": {
       "contents": [
