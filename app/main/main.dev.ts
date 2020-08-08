@@ -92,10 +92,6 @@ const createControlWindow = async () => {
     if (!controlWindow) {
       throw new Error('controlWindow is not defined');
     }
-
-    // Hack while debugging production issue
-    controlWindow.webContents.openDevTools();
-
     if (process.env.START_MINIMIZED) {
       controlWindow.minimize();
     } else {
