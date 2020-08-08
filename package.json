@@ -58,7 +58,7 @@
       "package.json",
       "main/main.prod.js",
       "main/main.prod.js.map",
-      "control/Control.html",
+      "control/control.html",
       "stimulus/stimulus.html"
     ],
     "dmg": {

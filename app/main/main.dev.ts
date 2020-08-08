@@ -80,7 +80,7 @@ const createControlWindow = async () => {
   });
 
   const controlUrl: string = url.format({
-    pathname: path.join(__dirname, '../control/Control.html'),
+    pathname: path.join(__dirname, '../control/control.html'),
     protocol: 'file:',
     slashes: true,
   });
