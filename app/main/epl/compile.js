@@ -1,6 +1,17 @@
 // Compile and run EyeCandy Programming Language
 // const {VM} = require('vm'); // TODO security risk, only for debug
-const { VM } = require('vm2');
+
+// The vm2 project that we use to compile and run EPL code in a sandbox is not
+// compatible with Webpack. The original discussion around this issue was quite
+// uncivil:
+//   https://github.com/patriksimek/vm2/issues/68
+// It appears some work was done on the issue but it was never completed:
+//   https://github.com/patriksimek/vm2/issues/70
+// So the end result it that we're using a fork that is Webpack-compatible:
+//   https://www.npmjs.com/package/@takeshape/vm2?activeTab=readme
+// This works but certainly isn't ideal.
+const { VM } = require('@takeshape/vm2');
+
 const R = require('ramda');
 const Types = require('./types');
 const Render = require('./render');
@@ -42,6 +53,7 @@ function compile(programJS, seed, windowHeight, windowWidth, dataDir) {
       ...EPL,
     },
     console: 'inherit',
+    compiler: 'javascript',
   });
   // ---- FOR VM2 ----
 
