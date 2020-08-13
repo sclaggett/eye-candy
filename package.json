@@ -246,6 +246,8 @@
     "electron-log": "^4.2.2",
     "electron-updater": "^4.3.1",
     "history": "4.7.2",
+    "mersennetwister": "^0.2.3",
+    "ramda": "^0.27.1",
     "react": "^16.13.1",
     "react-dom": "^16.12.0",
     "react-hot-loader": "^4.12.21",
@@ -253,7 +255,8 @@
     "react-router-dom": "^5.2.0",
     "redux": "^4.0.5",
     "redux-thunk": "^2.3.0",
-    "source-map-support": "^0.5.19"
+    "source-map-support": "^0.5.19",
+    "vm2": "^3.9.2"
   },
   "devEngines": {
     "node": ">=7.x",

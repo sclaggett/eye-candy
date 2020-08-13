@@ -34,7 +34,7 @@ function* measureIntegrity(stimuli,every=5*60) {
 
 
 function logMARtoLetterPx(logMAR, pxPerDegree=12.524) {
-    let degrees = pow(10,logMAR)/60
+    let degrees = (10 ** logMAR)/60
     // letter E has 2.5 wavelengths
     return round(degrees*pxPerDegree*2.5)
 }

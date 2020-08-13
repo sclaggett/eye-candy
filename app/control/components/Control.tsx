@@ -126,8 +126,12 @@ export default class Control extends React.Component<
   }
 
   onLoadClick() {
-    ipc.send('test-ipc');
-    // console.log('## onLoadClick()');
+    // console.log("## Start program: " + this.state.selectedProgram);
+    ipc.send(
+      'start-program',
+      this.state.selectedProgram,
+      Number(this.state.experimentSeed)
+    );
   }
 
   onStartClick() {

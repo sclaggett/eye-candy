@@ -177,6 +177,54 @@ app.on('ready', () => {
 });
 
 /**
+ * This IPC function will be called by the control window when the user wants
+ * to start running an EPL program. It contains the name of the program and seed
+ * as the parameters.
+ */
+
+const fs = require('fs');
+const compileEPL = require('./epl/compile');
+
+ipc.on('start-program', (...args: any[]) => {
+  // Parse the arguments
+  if (
+    args.length !== 3 ||
+    typeof args[1] !== 'string' ||
+    typeof args[2] !== 'number'
+  ) {
+    throw new Error('Invalid number of arguments for "start-program"');
+  }
+  const programName: string = args[1] as string;
+  const seed: number = args[2] as number;
+
+  // Load the program from the file system
+  fs.readFile(
+    `./resources/programs/${programName}`,
+    (err: Error, data: string) => {
+      // Make sure the file was loaded successfully
+      if (err) {
+        throw err;
+      }
+
+      // Compile and initialize the program
+      const program = compileEPL.compile(data, seed, 800, 600, '/data/');
+      program.initialize();
+
+      // Initialize the stimulus queue
+      const stimulusQueue = [];
+      for (let i = 0; i < 25; i += 1) {
+        stimulusQueue.push(program.next());
+      }
+      console.log(`Stimulus queue: ${JSON.stringify(stimulusQueue)}`);
+    }
+  );
+});
+
+ipc.on('stupidTypeScript', () => {
+  createStimulusWindow();
+});
+
+/**
  * Below are functions that make sure the electron application behaves properly
  * on Mac. The first keeps the main process running even when all windows are
  * closed while the second recreates the control window when the dock icon is
@@ -193,9 +241,4 @@ app.on('activate', () => {
   if (controlWindow === null) {
     createControlWindow();
   }
-});
-
-// Temp
-ipc.on('test-ipc', () => {
-  createStimulusWindow();
 });
