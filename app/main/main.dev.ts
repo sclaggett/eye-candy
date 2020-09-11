@@ -16,11 +16,21 @@ import path from 'path';
 import { app, BrowserWindow } from 'electron';
 import url from 'url';
 import MenuBuilder from './menu';
+import { Stimulus } from '../common/Stimulus';
 
 const ipc = require('electron').ipcMain;
+const fs = require('fs');
+const compileEPL = require('./epl/compile');
 
 let controlWindow: BrowserWindow | null = null;
 let stimulusWindow: BrowserWindow | null = null;
+
+// EPL-specific variables
+let programName = '';
+let seed = 0;
+let program: Record<string, any> | null = null;
+let stimulusQueue: Stimulus[] = [];
+let complete = false;
 
 /*
  * Install tools to aid in development and debugging. We use the 'source-map-support'
@@ -177,15 +187,37 @@ app.on('ready', () => {
 });
 
 /**
- * This IPC function will be called by the control window when the user wants
- * to start running an EPL program. It contains the name of the program and seed
+ * The fillStimulusQueue() function attempts to fill the queue with a fixed number
+ * of stimuli. It will set the "complete" flag if the end of the EPL program is reached
+ */
+
+// Number of stimuli to queue up for the stimulus window
+const STIMULUS_QUEUE_SIZE = 20;
+
+function fillStimulusQueue() {
+  if (complete) {
+    return;
+  }
+  if (program === null) {
+    throw new Error('Unable to fill stimulus queue, program is null');
+  }
+  for (let i = 0; i < STIMULUS_QUEUE_SIZE; i += 1) {
+    const stimulus: Stimulus = program.next() as Stimulus;
+    if (stimulus.done) {
+      complete = true;
+      return;
+    }
+    stimulusQueue.push(stimulus);
+  }
+}
+
+/**
+ * The "startProgram" IPC function will be called by the control window when the user
+ * wants to start running an EPL program. It contains the name of the program and seed
  * as the parameters.
  */
 
-const fs = require('fs');
-const compileEPL = require('./epl/compile');
-
-ipc.on('start-program', (...args: any[]) => {
+ipc.on('startProgram', (...args: any[]) => {
   // Parse the arguments
   if (
     args.length !== 3 ||
@@ -194,8 +226,8 @@ ipc.on('start-program', (...args: any[]) => {
   ) {
     throw new Error('Invalid number of arguments for "start-program"');
   }
-  const programName: string = args[1] as string;
-  const seed: number = args[2] as number;
+  programName = args[1] as string;
+  seed = args[2] as number;
 
   // Load the program from the file system
   fs.readFile(
@@ -206,22 +238,52 @@ ipc.on('start-program', (...args: any[]) => {
         throw err;
       }
 
-      // Compile and initialize the program
-      const program = compileEPL.compile(data, seed, 800, 600, '/data/');
-      program.initialize();
-
-      // Initialize the stimulus queue
-      const stimulusQueue = [];
-      for (let i = 0; i < 25; i += 1) {
-        stimulusQueue.push(program.next());
+      // Compile, initialize the program, and fill the stimulus queue
+      program = compileEPL.compile(data, seed, 800, 600, '/data/');
+      if (program === null) {
+        throw new Error('Failed to compile program');
       }
-      console.log(`Stimulus queue: ${JSON.stringify(stimulusQueue)}`);
+      program.initialize();
+      fillStimulusQueue();
+
+      // Create the stimulus window
+      createStimulusWindow();
     }
   );
 });
 
-ipc.on('stupidTypeScript', () => {
-  createStimulusWindow();
+/**
+ * The "getStimulusBatch" IPC function will be called by the stimulus window to retrieve
+ * the next batch of stimuli. It will return the next batch or an empty array if the
+ * program has finished.
+ */
+
+ipc.on('getStimulusBatch', (event) => {
+  // Return an empty batch if the program is complete.
+  if (complete) {
+    event.returnValue = [];
+    return;
+  }
+
+  // Synchronously fill the stimulus queue if it's empty. Note that this shouldn't happen
+  // under normal operating conditions.
+  if (stimulusQueue.length === 0) {
+    fillStimulusQueue();
+  }
+
+  // The structured cloning algorithm has problems serializing stimuli for some reason. Work
+  // around this by converting each object to a JSON string and parsing them to the correct
+  // type on the receiving end.
+  const duplicateQueue: string[] = [];
+  for (let i = 0; i < stimulusQueue.length; i += 1) {
+    duplicateQueue.push(JSON.stringify(stimulusQueue[i]));
+  }
+  event.returnValue = duplicateQueue;
+
+  // Clear the stimulus queue and schedule it to be filled asynchronously so we have data
+  // ready for a future call.
+  stimulusQueue = [];
+  setTimeout(fillStimulusQueue, 0);
 });
 
 /**

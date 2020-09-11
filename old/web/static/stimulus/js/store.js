@@ -173,6 +173,7 @@ async function loadPreRenderForStimuli(stimulusQueue) {
     return stimulusQueue
 }
 
+// This is where the action starts
 socket.on("run", async ({stimulusQueue, date}) => {
     console.log("socket 'run'")
     store.dispatch(setStartDate(date))

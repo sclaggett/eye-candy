@@ -158,7 +158,9 @@ Example:
 
 The new project is based on the [electron-react-boilerplate](https://electron-react-boilerplate.js.org/) repository which combines the [Electron](https://electron.atom.io/), [React](https://facebook.github.io/react/), [Redux](https://github.com/reactjs/redux), [React Router](https://github.com/reactjs/react-router), [Webpack](https://webpack.github.io/docs/) and [React Hot Loader](https://github.com/gaearon/react-hot-loader) frameworks into a single cross-platform desktop application.
 
-Installation:
+## Development
+
+Clone and initialize the repository:
 
 ```sh
 $ git clone git@github.com:sclaggett/eye-candy.git
@@ -166,10 +168,28 @@ $ cd eye-candy
 $ yarn
 ```
 
-Running in development mode:
+Build and launch the application in development mode:
 
 ```sh
 $ yarn dev
+```
+
+Save yourself some pain and suffering when committing changes by running the validation checks manually. Start by checking the syntax for errors:
+
+```sh
+$ yarn lint
+```
+
+You can fix some of the errors automatically by running:
+
+```sh
+$ yarn lint --fix
+```
+
+Next check for TypeScript errors:
+
+```sh
+$ yarn tsc
 ```
 
 Packaging for production:

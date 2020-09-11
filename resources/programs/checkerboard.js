@@ -93,6 +93,8 @@ for (let size of sizes) {
     }
 }
 
+stimuli = stimuli.slice(1, 100);
+
 r.shuffle(stimuli)
 
 stimuli = measureIntegrity(flatten(stimuli))
