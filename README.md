@@ -192,19 +192,10 @@ Next check for TypeScript errors:
 $ yarn tsc
 ```
 
-Packaging for production:
+Make sure the package can be built:
 
 ```sh
 $ yarn package
 ```
 
-Running production build locally:
-
-```sh
-$ yarn start
-```
-
-```sh
-$ cd eye-candy/old
-$ rsync -c -rlgoz . {user@host}:~/eye-candy
-```
+Finally commit your changes using git.
