@@ -16,7 +16,10 @@ import path from 'path';
 import { app, BrowserWindow } from 'electron';
 import url from 'url';
 import MenuBuilder from './menu';
-import { Stimulus } from '../common/Stimulus';
+import ProgramNext from '../common/ProgramNext';
+import StartProgram from '../common/StartProgram';
+import Stimulus from '../common/stimuli/Stimulus';
+import VideoInfo from '../common/VideoInfo';
 
 const ipc = require('electron').ipcMain;
 const fs = require('fs');
@@ -25,12 +28,14 @@ const compileEPL = require('./epl/compile');
 let controlWindow: BrowserWindow | null = null;
 let stimulusWindow: BrowserWindow | null = null;
 
-// EPL-specific variables
-let programName = '';
-let seed = 0;
+// Details of the video we're recording
+const videoInfo = new VideoInfo();
+
+// Compiled EPL program
 let program: Record<string, any> | null = null;
+
+// Queue of stimuli that haven't been played yet
 let stimulusQueue: Stimulus[] = [];
-let complete = false;
 
 /*
  * Install tools to aid in development and debugging. We use the 'source-map-support'
@@ -132,8 +137,8 @@ const createStimulusWindow = async () => {
 
   stimulusWindow = new BrowserWindow({
     show: false,
-    width: 1024,
-    height: 728,
+    width: videoInfo.width,
+    height: videoInfo.height,
     webPreferences:
       (process.env.NODE_ENV === 'development' ||
         process.env.E2E_BUILD === 'true') &&
@@ -182,7 +187,6 @@ const createStimulusWindow = async () => {
  */
 
 app.on('ready', () => {
-  // TODO: Detect monitors before creating the control window
   createControlWindow();
 });
 
@@ -195,19 +199,22 @@ app.on('ready', () => {
 const STIMULUS_QUEUE_SIZE = 20;
 
 function fillStimulusQueue() {
-  if (complete) {
+  if (videoInfo.complete) {
     return;
   }
   if (program === null) {
     throw new Error('Unable to fill stimulus queue, program is null');
   }
   for (let i = 0; i < STIMULUS_QUEUE_SIZE; i += 1) {
-    const stimulus: Stimulus = program.next() as Stimulus;
-    if (stimulus.done) {
-      complete = true;
+    const response: ProgramNext = program.next() as ProgramNext;
+    if (response.done) {
+      videoInfo.complete = true;
       return;
     }
-    stimulusQueue.push(stimulus);
+    if (response.value === null) {
+      throw new Error('Program response did not contain a stimulus');
+    }
+    stimulusQueue.push(response.value);
   }
 }
 
@@ -219,19 +226,27 @@ function fillStimulusQueue() {
 
 ipc.on('startProgram', (...args: any[]) => {
   // Parse the arguments
-  if (
-    args.length !== 3 ||
-    typeof args[1] !== 'string' ||
-    typeof args[2] !== 'number'
-  ) {
+  if (args.length !== 2 || typeof args[1] !== 'string') {
     throw new Error('Invalid number of arguments for "start-program"');
   }
-  programName = args[1] as string;
-  seed = args[2] as number;
+  const startProgramArgs: StartProgram = JSON.parse(
+    args[1] as string
+  ) as StartProgram;
+
+  console.log(`Start program: ${JSON.stringify(startProgramArgs)}`);
+
+  // Copy the arguments to the video info
+  videoInfo.programName = startProgramArgs.programName;
+  videoInfo.seed = startProgramArgs.seed;
+  videoInfo.width = startProgramArgs.width;
+  videoInfo.height = startProgramArgs.height;
+  videoInfo.fps = startProgramArgs.fps;
+
+  console.log(`Video info: ${JSON.stringify(videoInfo)}`);
 
   // Load the program from the file system
   fs.readFile(
-    `./resources/programs/${programName}`,
+    `./resources/programs/${videoInfo.programName}`,
     (err: Error, data: string) => {
       // Make sure the file was loaded successfully
       if (err) {
@@ -239,7 +254,7 @@ ipc.on('startProgram', (...args: any[]) => {
       }
 
       // Compile, initialize the program, and fill the stimulus queue
-      program = compileEPL.compile(data, seed, 800, 600, '/data/');
+      program = compileEPL.compile(data, videoInfo.seed, 800, 600, '/data/');
       if (program === null) {
         throw new Error('Failed to compile program');
       }
@@ -253,6 +268,15 @@ ipc.on('startProgram', (...args: any[]) => {
 });
 
 /**
+ * The "getVideoInfo" IPC function will be called by the stimulus window to retrieve
+ * details for the video we're recording.
+ */
+
+ipc.on('getVideoInfo', (event) => {
+  event.returnValue = JSON.stringify(videoInfo);
+});
+
+/**
  * The "getStimulusBatch" IPC function will be called by the stimulus window to retrieve
  * the next batch of stimuli. It will return the next batch or an empty array if the
  * program has finished.
@@ -260,7 +284,7 @@ ipc.on('startProgram', (...args: any[]) => {
 
 ipc.on('getStimulusBatch', (event) => {
   // Return an empty batch if the program is complete.
-  if (complete) {
+  if (videoInfo.complete) {
     event.returnValue = [];
     return;
   }

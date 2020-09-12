@@ -1,5 +1,13 @@
 # Eye Candy
 
+## Acuity
+
+{"value":{"lifespan":2.16,"backgroundColor":"black","metadata":{"group":"ba8a3ecd-298b-44c4-b5cc-27a87b2a0d78"},"age":0,"stimulusType":"BAR","speed":500,"width":80,"angle":2.8797932657906435,"barColor":"white"},"done":false,"stimulusIndex":0}
+
+## Grating
+
+{"value":{"lifespan":2,"backgroundColor":"black","metadata":{"group":"f467fb9e-41bf-4b7f-af43-050798f8af20","cohort":"06b0f056-1fa8-4357-af4d-441a85299e49","class":"REVERSE","block":true},"age":0,"stimulusType":"GRATING","speed":200,"width":132,"angle":3.9269908169872414,"barColor":"white"},"done":false,"stimulusIndex":4}
+
 **Note.** This project is currently in a state of flux while it is being ported to the Electron framework. The [old project](old/README.md) is still around and can be found in the `old` folder.
 
 **Licenses.** This project is proprietary (unlicensed) and owned by the University of Washington.

@@ -1,6 +1,9 @@
 import React from 'react';
 import * as styles from './StimulusRenderer.css';
-import { Stimulus } from '../../common/Stimulus';
+import Stimulus from '../../common/stimuli/Stimulus';
+import StimulusBase from '../stimuli/StimulusBase';
+import StimulusFactory from '../stimuli/StimulusFactory';
+import VideoInfo from '../../common/VideoInfo';
 
 const ipc = require('electron').ipcRenderer;
 
@@ -8,13 +11,26 @@ type StimulusRendererProps = {
   dummy: string;
 };
 
+/*
+ * This component's lifecycle consists of three stages:
+ *  1. Starting: For frames 1 and 2, the component hasn't fully initialized the stimulus
+ *     queue. Also, for frame 1, the component doesn't have a reference to the canvas
+ *     element yet. These first two frames need to be discarded by the encoder.
+ *  2. Running: Stimuli are being rendered to the browser window at exactly one stimulus
+ *     per frame.
+ *  3. Complete: The program is complete and no more stimuli exist to be rendered.
+ */
+enum LifecycleStage {
+  STARTING,
+  RUNNING,
+  COMPLETE,
+}
+
 type StimulusRendererState = {
-  complete: boolean;
-  // time: number;
-  // frameNumber: number;
-  stimulus: Stimulus | null;
+  lifecycleStage: LifecycleStage;
+  videoInfo: VideoInfo | null;
+  stimulus: StimulusBase | null;
   stimulusQueue: Stimulus[];
-  // graphics: string[];
 };
 
 // The next batch of stimuli will be retrieved from the main process when our queue reaches
@@ -25,64 +41,119 @@ export default class StimulusRenderer extends React.Component<
   StimulusRendererProps,
   StimulusRendererState
 > {
-  frameNumber: number; // Temp
+  canvasRef: React.RefObject<HTMLCanvasElement>;
+
+  frameCount: number; // Temp
 
   constructor(props: StimulusRendererProps) {
     super(props);
+
     this.state = {
-      complete: false,
-      // time: 0,
-      // frameNumber: 0,
+      lifecycleStage: LifecycleStage.STARTING,
+      videoInfo: null,
       stimulus: null,
       stimulusQueue: [],
-      // graphics: [],
     };
+
     this.onAnimationFrame = this.onAnimationFrame.bind(this);
 
-    this.frameNumber = 0; // Temp
+    this.canvasRef = React.createRef<HTMLCanvasElement>();
+
+    this.frameCount = 0; // Temp
   }
 
   /*
    * The componentDidMount() function is invoked when the component is mounted in the
-   * DOM and is a good spot to perform class initialization. Retrieve the initial list
-   * of stimuli from the main process and queue an animation request for the next frame.
+   * DOM and is a good spot to perform class initialization. Retrieve the video
+   * inforation and the initial list of stimuli from the main process and queue an
+   * animation request so onAnimationFrame() will be called before the next frame
+   * is rendered.
    */
   componentDidMount() {
+    this.fetchVideoInfo();
     this.fetchStimulusBatch();
     requestAnimationFrame(this.onAnimationFrame);
   }
 
+  /*
+   * The onAnimationFrame() function is invoked by the browser before it renders the next
+   * frame. It's the mechanism to use because we want to display one stimulus per frame
+   * without having to worry about the number of frames per second that the browser is
+   * running at. Copy the next stimulus from the queue to the state which will trigger a
+   * call to render().
+   */
   onAnimationFrame(_timestamp: any) {
-    // Queue the animation request for next frame. This is done first, before the
-    // front stimulus is popped off the queue, because we want to do a final render
-    // on completion
-    if (this.state.stimulusQueue.length > 0) {
-      requestAnimationFrame(this.onAnimationFrame);
-    }
-
-    // Pop the next stimulus off the front of the queue if one exists or clear the
-    // state field if not.
-    if (this.state.stimulusQueue.length > 0) {
-      this.frameNumber += 1;
-      if (this.frameNumber % 5) {
-        this.setState((prevState) => ({
-          stimulus: prevState.stimulusQueue[0],
-          stimulusQueue: prevState.stimulusQueue.slice(1),
-        }));
-      }
-    } else {
+    // Detect the lifecycle change from starting to running based on whether we have a
+    // canvas reference or not, which in turn influences whether the render() function will
+    // show the canvas or not.
+    if (
+      this.canvasRef.current !== null &&
+      this.state.lifecycleStage === LifecycleStage.STARTING
+    ) {
       this.setState({
-        stimulus: null,
+        lifecycleStage: LifecycleStage.RUNNING,
       });
     }
 
-    // Fetch the next batch of stimuli if we're getting low
+    // Advance to the next stimulus if the current one has no more frames left to render.
+    // Note that we use a local variable to keep track of the current stimulus because the
+    // setState() call is asynchronous.
+    let { stimulus } = this.state;
+    if (stimulus === null || !stimulus.hasFrames()) {
+      if (this.state.stimulusQueue.length > 0) {
+        if (this.state.videoInfo === null) {
+          throw new Error('Video info missing');
+        }
+        stimulus = StimulusFactory.createStimulus(
+          this.state.stimulusQueue[0],
+          this.state.videoInfo
+        );
+        this.setState((prevState) => ({
+          stimulus,
+          stimulusQueue: prevState.stimulusQueue.slice(1),
+        }));
+      } else {
+        stimulus = null;
+        this.setState({
+          stimulus: null,
+        });
+      }
+    }
+
+    // Allow the current stimulus to render to the canvas.
+    if (
+      this.canvasRef !== null &&
+      this.canvasRef.current !== null &&
+      stimulus !== null
+    ) {
+      const context: CanvasRenderingContext2D | null = this.canvasRef.current.getContext(
+        '2d'
+      );
+      if (context != null) {
+        stimulus.render(context);
+      }
+    }
+
+    // Fetch the next batch of stimuli if we're getting low.
     if (
       this.state.stimulusQueue.length <= STIMULUS_RELOAD_THRESHOLD &&
-      !this.state.complete
+      this.state.lifecycleStage !== LifecycleStage.COMPLETE
     ) {
       this.fetchStimulusBatch();
     }
+
+    // Queue the animation request for next frame so this function will be invoked again.
+    requestAnimationFrame(this.onAnimationFrame);
+  }
+
+  /*
+   * The fetchVideoInfo() function retrieves details regarding the video we're simulating
+   * frames for like dimensions and frames per second.
+   */
+  fetchVideoInfo() {
+    this.setState({
+      videoInfo: JSON.parse(ipc.sendSync('getVideoInfo')) as VideoInfo,
+    });
   }
 
   /*
@@ -91,7 +162,8 @@ export default class StimulusRenderer extends React.Component<
    * corresponding flag in the state.
    */
   fetchStimulusBatch() {
-    if (this.state.complete) {
+    // Ignore this call if the program is done running.
+    if (this.state.lifecycleStage === LifecycleStage.COMPLETE) {
       return;
     }
 
@@ -100,16 +172,17 @@ export default class StimulusRenderer extends React.Component<
     const rawStimuli: string[] = ipc.sendSync('getStimulusBatch');
     if (rawStimuli.length === 0) {
       this.setState({
-        complete: true,
+        lifecycleStage: LifecycleStage.COMPLETE,
       });
       return;
     }
 
-    // Parse the JSON strings, cast them as Stimulus objects, and update the state
+    // Parse the JSON strings, cast them as Stimulus objects, and update the state.
     const parsedStimuli: Stimulus[] = [];
     for (let i = 0; i < rawStimuli.length; i += 1) {
       parsedStimuli.push(JSON.parse(rawStimuli[i]) as Stimulus);
     }
+
     this.setState((prevState) => ({
       stimulusQueue: [...prevState.stimulusQueue, ...parsedStimuli],
     }));
@@ -118,21 +191,20 @@ export default class StimulusRenderer extends React.Component<
   /*
    * The render() function converts the state into a JSX description of the interface
    * that should be displayed and the framework will update the output as necessary.
-   * The following code could be decomposed into smaller components which might make
-   * everything more readable.
    */
   render() {
-    if (this.state.stimulus !== null) {
-      console.log(`Rendering stimulus: ${this.state.stimulus})`);
-    } else if (this.state.complete) {
-      console.log('Program complete');
-    } else {
-      console.log('Error: Starved for stimuli');
+    // Render a blank output if we're out of stimuli and the program is complete and
+    // throw an error if we end up starved for stimuli.
+    if (this.state.stimulus === null) {
+      if (this.state.lifecycleStage !== LifecycleStage.RUNNING) {
+        return <div className={styles.containerStopped} />;
+      }
+      throw new Error('Render loop starved for stimuli');
     }
 
     return (
-      <div className={styles.container} data-tid="container">
-        <div>{JSON.stringify(this.state.stimulus)}</div>
+      <div className={styles.containerRunning}>
+        <canvas ref={this.canvasRef} className={styles.stimulationCanvas} />
       </div>
     );
   }

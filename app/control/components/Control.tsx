@@ -1,5 +1,6 @@
 import React from 'react';
 import * as styles from './Control.css';
+import StartProgram from '../../common/StartProgram';
 
 const ipc = require('electron').ipcRenderer;
 const fs = require('fs');
@@ -90,8 +91,7 @@ export default class Control extends React.Component<
   componentDidMount() {
     fs.readdir('./resources/programs', (err: Error, dir: string[]) => {
       if (err) {
-        // console.log(`Failed to read programs directory: ${err}`);
-        return;
+        throw new Error(`Failed to read programs directory: ${err}`);
       }
       const programs: string[] = [];
       for (let i = 0; i < dir.length; i += 1) {
@@ -126,12 +126,13 @@ export default class Control extends React.Component<
   }
 
   onLoadClick() {
-    // console.log("## Start program: " + this.state.selectedProgram);
-    ipc.send(
-      'startProgram',
-      this.state.selectedProgram,
-      Number(this.state.experimentSeed)
-    );
+    const args: StartProgram = new StartProgram();
+    args.programName = this.state.selectedProgram;
+    args.seed = Number(this.state.experimentSeed);
+    args.width = 1024;
+    args.height = 800;
+    args.fps = 30;
+    ipc.send('startProgram', JSON.stringify(args));
   }
 
   onStartClick() {
