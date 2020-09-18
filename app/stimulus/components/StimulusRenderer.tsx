@@ -82,7 +82,7 @@ export default class StimulusRenderer extends React.Component<
    * running at. Copy the next stimulus from the queue to the state which will trigger a
    * call to render().
    */
-  onAnimationFrame(_timestamp: any) {
+  onAnimationFrame(_timestamp: number) {
     // Detect the lifecycle change from starting to running based on whether we have a
     // canvas reference or not, which in turn influences whether the render() function will
     // show the canvas or not.
@@ -98,22 +98,23 @@ export default class StimulusRenderer extends React.Component<
     // Advance to the next stimulus if the current one has no more frames left to render.
     // Note that we use a local variable to keep track of the current stimulus because the
     // setState() call is asynchronous.
-    let { stimulus } = this.state;
-    if (stimulus === null || !stimulus.hasFrames()) {
+    let currentStimulus = this.state.stimulus;
+    if (currentStimulus === null || !currentStimulus.hasFrames()) {
       if (this.state.stimulusQueue.length > 0) {
         if (this.state.videoInfo === null) {
           throw new Error('Video info missing');
         }
-        stimulus = StimulusFactory.createStimulus(
+        console.log(`Creating stimulus: ${JSON.stringify(currentStimulus)}`);
+        currentStimulus = StimulusFactory.createStimulus(
           this.state.stimulusQueue[0],
           this.state.videoInfo
         );
         this.setState((prevState) => ({
-          stimulus,
+          stimulus: currentStimulus,
           stimulusQueue: prevState.stimulusQueue.slice(1),
         }));
       } else {
-        stimulus = null;
+        currentStimulus = null;
         this.setState({
           stimulus: null,
         });
@@ -124,13 +125,13 @@ export default class StimulusRenderer extends React.Component<
     if (
       this.canvasRef !== null &&
       this.canvasRef.current !== null &&
-      stimulus !== null
+      currentStimulus !== null
     ) {
       const context: CanvasRenderingContext2D | null = this.canvasRef.current.getContext(
         '2d'
       );
       if (context != null) {
-        stimulus.render(context);
+        currentStimulus.render(context);
       }
     }
 

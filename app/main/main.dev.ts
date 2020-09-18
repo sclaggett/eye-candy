@@ -13,7 +13,7 @@
  */
 
 import path from 'path';
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, dialog } from 'electron';
 import url from 'url';
 import MenuBuilder from './menu';
 import ProgramNext from '../common/ProgramNext';
@@ -22,14 +22,13 @@ import Stimulus from '../common/stimuli/Stimulus';
 import VideoInfo from '../common/VideoInfo';
 
 const ipc = require('electron').ipcMain;
-const fs = require('fs');
 const compileEPL = require('./epl/compile');
 
 let controlWindow: BrowserWindow | null = null;
 let stimulusWindow: BrowserWindow | null = null;
 
 // Details of the video we're recording
-const videoInfo = new VideoInfo();
+let videoInfo: VideoInfo | null = null;
 
 // Compiled EPL program
 let program: Record<string, any> | null = null;
@@ -65,6 +64,26 @@ const installExtensions = async () => {
     extensions.map((name) => installer.default(installer[name], forceDownload))
   ).catch(console.log);
 };
+
+/**
+ * TODO: The following functions are invoked from the menu bar.
+ */
+
+function onFileNew() {
+  console.log('## File new');
+}
+
+function onFileOpen() {
+  console.log('## File open');
+}
+
+function onFileSave() {
+  console.log('## File save');
+}
+
+function onFileSaveAs() {
+  console.log('## File save as');
+}
 
 /*
  * Define an asychronous function that creates the control window.
@@ -119,7 +138,13 @@ const createControlWindow = async () => {
     controlWindow = null;
   });
 
-  const menuBuilder = new MenuBuilder(controlWindow);
+  const menuBuilder = new MenuBuilder(
+    controlWindow,
+    onFileNew,
+    onFileOpen,
+    onFileSave,
+    onFileSaveAs
+  );
   menuBuilder.buildMenu();
 };
 
@@ -135,6 +160,9 @@ const createStimulusWindow = async () => {
     await installExtensions();
   }
 
+  if (videoInfo === null) {
+    throw new Error('Cannot create stimulus window when video info is null');
+  }
   stimulusWindow = new BrowserWindow({
     show: false,
     width: videoInfo.width,
@@ -176,9 +204,6 @@ const createStimulusWindow = async () => {
   stimulusWindow.on('closed', () => {
     stimulusWindow = null;
   });
-
-  const menuBuilder = new MenuBuilder(stimulusWindow);
-  menuBuilder.buildMenu();
 };
 
 /**
@@ -191,6 +216,35 @@ app.on('ready', () => {
 });
 
 /**
+ * The "selectOutputDirectory" IPC function will be called by the control window when
+ * the user wants to select the output directory. The currently selected directory or
+ * an empty string will be passed as the parameter.
+ */
+
+ipc.on('selectOutputDirectory', (event, initialDirectory: string) => {
+  // Open a modal directory selection dialog
+  if (controlWindow === null) {
+    throw new Error(
+      'Cannot select output directory when control window is null'
+    );
+  }
+  const result: string[] | undefined = dialog.showOpenDialogSync(
+    controlWindow,
+    {
+      defaultPath: initialDirectory,
+      properties: ['openDirectory', 'createDirectory'],
+    }
+  );
+
+  // Pass the selected directory to the control window
+  if (result !== undefined && result.length > 0) {
+    [event.returnValue] = result;
+  } else {
+    event.returnValue = null;
+  }
+});
+
+/**
  * The fillStimulusQueue() function attempts to fill the queue with a fixed number
  * of stimuli. It will set the "complete" flag if the end of the EPL program is reached
  */
@@ -199,6 +253,9 @@ app.on('ready', () => {
 const STIMULUS_QUEUE_SIZE = 20;
 
 function fillStimulusQueue() {
+  if (videoInfo === null) {
+    throw new Error('Cannot fill stimulus queue when video info is null');
+  }
   if (videoInfo.complete) {
     return;
   }
@@ -224,47 +281,42 @@ function fillStimulusQueue() {
  * as the parameters.
  */
 
-ipc.on('startProgram', (...args: any[]) => {
-  // Parse the arguments
-  if (args.length !== 2 || typeof args[1] !== 'string') {
-    throw new Error('Invalid number of arguments for "start-program"');
-  }
-  const startProgramArgs: StartProgram = JSON.parse(
-    args[1] as string
-  ) as StartProgram;
-
-  console.log(`Start program: ${JSON.stringify(startProgramArgs)}`);
+ipc.on('startProgram', (_event, stringArg: string) => {
+  // Parse the argument
+  const startProgramArgs: StartProgram = JSON.parse(stringArg) as StartProgram;
 
   // Copy the arguments to the video info
+  videoInfo = new VideoInfo();
+  videoInfo.outputDirectory = startProgramArgs.outputDirectory;
+  videoInfo.rootFileName = startProgramArgs.rootFileName;
   videoInfo.programName = startProgramArgs.programName;
+  videoInfo.programText = startProgramArgs.programText;
   videoInfo.seed = startProgramArgs.seed;
   videoInfo.width = startProgramArgs.width;
   videoInfo.height = startProgramArgs.height;
   videoInfo.fps = startProgramArgs.fps;
 
-  console.log(`Video info: ${JSON.stringify(videoInfo)}`);
+  // Reset our internal state variables
+  stimulusWindow = null;
+  program = null;
+  stimulusQueue = [];
 
-  // Load the program from the file system
-  fs.readFile(
-    `./resources/programs/${videoInfo.programName}`,
-    (err: Error, data: string) => {
-      // Make sure the file was loaded successfully
-      if (err) {
-        throw err;
-      }
-
-      // Compile, initialize the program, and fill the stimulus queue
-      program = compileEPL.compile(data, videoInfo.seed, 800, 600, '/data/');
-      if (program === null) {
-        throw new Error('Failed to compile program');
-      }
-      program.initialize();
-      fillStimulusQueue();
-
-      // Create the stimulus window
-      createStimulusWindow();
-    }
+  // Compile, initialize the program, and fill the stimulus queue
+  program = compileEPL.compile(
+    videoInfo.programText,
+    videoInfo.seed,
+    videoInfo.width,
+    videoInfo.height,
+    '/data/'
   );
+  if (program === null) {
+    throw new Error('Failed to compile program');
+  }
+  program.initialize();
+  fillStimulusQueue();
+
+  // Create the stimulus window
+  createStimulusWindow();
 });
 
 /**
@@ -284,6 +336,9 @@ ipc.on('getVideoInfo', (event) => {
 
 ipc.on('getStimulusBatch', (event) => {
   // Return an empty batch if the program is complete.
+  if (videoInfo === null) {
+    throw new Error('Cannot get stimulus batch when video info is null');
+  }
   if (videoInfo.complete) {
     event.returnValue = [];
     return;

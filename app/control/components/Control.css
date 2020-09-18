@@ -5,6 +5,8 @@
   top: 10px;
   bottom: 10px;
   overflow-y: scroll;
+  display: flex;
+  flex-direction: column;
 }
 
 .logo {
@@ -19,16 +21,21 @@
 .columns {
   display: flex;
   flex-direction: row;
+  height: 100%;
 }
 
 .columnLeft {
-  flex: 1;
+  flex: 2;
   padding-right: 10px;
+  height: 100%;
 }
 
 .columnRight {
-  flex: 1;
+  flex: 3;
   padding-left: 10px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .section {
@@ -41,7 +48,7 @@
 }
 
 .field {
-  width: 12em;
+  width: 10em;
 }
 
 .value {
@@ -53,23 +60,45 @@
   flex: 1;
 }
 
-.program {
-  flex: 1;
-  display: flex;
+.inputNarrow {
+  width: 10em;
 }
 
-.buttons {
-  display: flex;
-}
-
-.button {
-  flex: 1;
-  margin-right: 5px;
+.dirSelect {
+  background-image: url('../../../resources/icons/Folder.png');
+  background-color: khaki;
+  background-repeat: no-repeat;
+  background-position: 0 0;
+  border: none;
+  cursor: pointer;
+  height: 20px;
+  padding-left: 15px;
 }
 
 .preview {
-  height: 300px;
+  height: 400px;
   background-color: #ccc;
   margin-top: 10px;
   margin-bottom: 10px;
+}
+
+.button {
+  display: flex;
+  justify-content: center;
+}
+
+.programNames {
+  flex: 1;
+  display: flex;
+}
+
+.programText {
+  margin-top: 5px;
+  display: flex;
+  height: 100%;
+}
+
+.programTextArea {
+  width: 100%;
+  resize: none;
 }

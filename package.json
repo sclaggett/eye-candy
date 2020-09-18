@@ -46,7 +46,7 @@
     ]
   },
   "build": {
-    "productName": "eye-candy",
+    "productName": "EyeCandy",
     "files": [
       "dist/",
       "node_modules/",
