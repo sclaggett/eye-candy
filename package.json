@@ -1,6 +1,6 @@
 {
   "name": "eye-candy-root",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Eye Candy root project",
   "scripts": {
     "build": "concurrently \"yarn build-main\" \"yarn build-renderer\"",
@@ -245,6 +245,7 @@
     "electron-updater": "^4.3.1",
     "history": "4.7.2",
     "mersennetwister": "^0.2.3",
+    "native": "link:./native",
     "ramda": "^0.27.1",
     "react": "^16.13.1",
     "react-dom": "^16.12.0",

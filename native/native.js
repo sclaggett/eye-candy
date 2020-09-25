@@ -1,6 +1,15 @@
-const testAddon = require('./build/Release/testaddon.node');
+// const native = require('./build/Release/native.node');
+const native = require('bindings')('native');
 
-console.log('addon', testAddon);
+function test() {
+  console.log('## Test', native.hello());
+}
+
+function test2() {
+  console.log('## Test2', native.add(5, 10));
+}
+
+/*
 console.log('hello ', testAddon.hello());
 console.log('add ', testAddon.add(5, 10));
 
@@ -14,3 +23,6 @@ console.log('Testing class initial value for derived instance');
 console.log(newFromExisting.getValue());
 
 module.exports = testAddon;
+*/
+
+export { test, test2 };

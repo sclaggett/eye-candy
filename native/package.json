@@ -1,15 +1,16 @@
 {
-  "name": "test-addon",
+  "name": "native",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "native.js",
   "gypfile": true,
   "scripts": {
     "build": "node-gyp rebuild",
+    "install": "node-gyp rebuild",
     "clean": "node-gyp clean"
   },
   "author": "",
-  "license": "ISC",
+  "license": "UNLICENSED",
   "devDependencies": {
     "node-gyp": "^3.7.0"
   },

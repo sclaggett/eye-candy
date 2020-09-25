@@ -22,6 +22,7 @@ import Stimulus from '../common/stimuli/Stimulus';
 import VideoInfo from '../common/VideoInfo';
 
 const ipc = require('electron').ipcMain;
+const native = require('native');
 const compileEPL = require('./epl/compile');
 
 let controlWindow: BrowserWindow | null = null;
@@ -208,6 +209,16 @@ const createStimulusWindow = async () => {
  * avoid the overhead of compositing on the GPU.
  */
 app.disableHardwareAcceleration();
+
+// const testNative = require('../../native/build/Release/native.node');
+// const testNative = require("bindings")("native");
+native.test();
+
+/*
+var PACKAGE_JSON = path.join(__dirname, 'package.json');
+var binding_path = binary.find(path.resolve(PACKAGE_JSON));
+var SerialPortBinding = require(binding_path);
+*/
 
 /**
  * The starting point for an electron application is when the ready event is

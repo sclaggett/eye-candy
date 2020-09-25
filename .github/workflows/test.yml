@@ -23,6 +23,10 @@ jobs:
         run: |
           yarn install --frozen-lockfile
 
+      - name: yarn electron-rebuild
+        run: |
+          yarn electron-rebuild
+
       - name: yarn test
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
