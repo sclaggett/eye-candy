@@ -1,9 +1,9 @@
-module.exports = {
-  sqrt: Math.sqrt,
-  sin: Math.sin,
-  cos: Math.cos,
-  PI: Math.PI,
-  round: Math.round,
-  floor: Math.floor,
-  ceil: Math.ceil,
-};
+const { sqrt } = Math;
+const { sin } = Math;
+const { cos } = Math;
+const { PI } = Math;
+const { round } = Math;
+const { floor } = Math;
+const { ceil } = Math;
+
+export { sqrt, sin, cos, PI, round, floor, ceil };

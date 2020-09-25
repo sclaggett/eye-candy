@@ -1,4 +1,5 @@
 import React from 'react';
+import { IpcRendererEvent } from 'electron';
 import * as styles from './Control.css';
 import StartProgram from '../../common/StartProgram';
 
@@ -20,6 +21,11 @@ type ControlState = {
   fps: number;
   seed: number;
   running: boolean;
+  /*
+  previewData: string | null;
+  previewWidth: number;
+  previewHeight: number;
+  */
 };
 
 export default class Control extends React.Component<
@@ -39,7 +45,17 @@ export default class Control extends React.Component<
       fps: 30,
       seed: 0,
       running: false,
+      /*
+      previewData: null,
+      previewWidth: 0,
+      previewHeight: 0,
+      */
     };
+
+    // Bind the onPreviewBitmap() handler so "this" will be defined when it is invoked
+    // and listen for "previewBitmap" IPC calls
+    this.onPreviewBitmap = this.onPreviewBitmap.bind(this);
+    ipc.on('previewBitmap', this.onPreviewBitmap);
   }
 
   /*
@@ -145,6 +161,26 @@ export default class Control extends React.Component<
         outputDirectory: selectedDirectory,
       });
     }
+  }
+
+  /*
+   * The onPreviewBitmap() function will be invoked by the main process when a stimulus
+   * preview bitmap is available to display to the user.
+   */
+  onPreviewBitmap(
+    _event: IpcRendererEvent,
+    _data: string,
+    _width: number,
+    _height: number
+  ) {
+    // console.log('## onPreviewBitmap');
+    /*
+    this.setState({
+      previewData: data,
+      previewWidth: width,
+      previewHeight: height,
+    });
+    */
   }
 
   onButtonClick() {

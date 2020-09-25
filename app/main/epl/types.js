@@ -12,7 +12,7 @@ import TiledLetter from './types/TiledLetter';
 import Video from './types/Video';
 import Wait from './types/Wait';
 
-module.exports = {
+export {
   Bar,
   Checkerboard,
   Chirp,

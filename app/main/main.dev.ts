@@ -13,7 +13,7 @@
  */
 
 import path from 'path';
-import { app, BrowserWindow, dialog } from 'electron';
+import { app, BrowserWindow, dialog, nativeImage, Rectangle } from 'electron';
 import url from 'url';
 import MenuBuilder from './menu';
 import ProgramNext from '../common/ProgramNext';
@@ -42,7 +42,6 @@ let stimulusQueue: Stimulus[] = [];
  * library while debugging. Define the 'installExtensions()' function that will be
  * called by each render window to install development tools.
  */
-
 if (process.env.NODE_ENV === 'production') {
   const sourceMapSupport = require('source-map-support');
   sourceMapSupport.install();
@@ -88,7 +87,6 @@ function onFileSaveAs() {
 /*
  * Define an asychronous function that creates the control window.
  */
-
 const createControlWindow = async () => {
   if (
     process.env.NODE_ENV === 'development' ||
@@ -151,7 +149,6 @@ const createControlWindow = async () => {
 /*
  * Define an asychronous function that creates the offscreen stimulus window.
  */
-
 const createStimulusWindow = async () => {
   if (
     process.env.NODE_ENV === 'development' ||
@@ -172,9 +169,11 @@ const createStimulusWindow = async () => {
         process.env.E2E_BUILD === 'true') &&
       process.env.ERB_SECURE !== 'true'
         ? {
+            offscreen: true,
             nodeIntegration: true,
           }
         : {
+            offscreen: true,
             preload: path.join(__dirname, '../dist/renderer.prod.js'),
           },
   });
@@ -187,30 +186,33 @@ const createStimulusWindow = async () => {
     })
   );
 
-  // @TODO: Use "ready-to-show" event
-  //        https://github.com/electron/electron/blob/master/docs/api/browser-window.md#using-ready-to-show-event
-  stimulusWindow.webContents.on('did-finish-load', () => {
-    if (!stimulusWindow) {
-      throw new Error('stimulusWindow is not defined');
+  // This function will be invoked for each frame that is rendered by the
+  // stimlulus window.
+  stimulusWindow.webContents.on(
+    'paint',
+    (_event: Event, _dirty: Rectangle, _image: nativeImage) => {
+      /*
+      if (controlWindow === null) {
+        return
+      }
+      let size: Size = image.getSize();
+      controlWindow.webContents.send('previewBitmap', '', //image.toBitmap(),
+        size.width, size.height);
+      */
     }
-    if (process.env.START_MINIMIZED) {
-      stimulusWindow.minimize();
-    } else {
-      stimulusWindow.show();
-      stimulusWindow.focus();
-    }
-  });
-
-  stimulusWindow.on('closed', () => {
-    stimulusWindow = null;
-  });
+  );
 };
+
+/**
+ * We don't make use of WebGL or 3D CSS animations so disable hardware acceleration to
+ * avoid the overhead of compositing on the GPU.
+ */
+app.disableHardwareAcceleration();
 
 /**
  * The starting point for an electron application is when the ready event is
  * emitted by the framework.
  */
-
 app.on('ready', () => {
   createControlWindow();
 });
@@ -220,7 +222,6 @@ app.on('ready', () => {
  * the user wants to select the output directory. The currently selected directory or
  * an empty string will be passed as the parameter.
  */
-
 ipc.on('selectOutputDirectory', (event, initialDirectory: string) => {
   // Open a modal directory selection dialog
   if (controlWindow === null) {
@@ -246,12 +247,11 @@ ipc.on('selectOutputDirectory', (event, initialDirectory: string) => {
 
 /**
  * The fillStimulusQueue() function attempts to fill the queue with a fixed number
- * of stimuli. It will set the "complete" flag if the end of the EPL program is reached
+ * of stimuli. It will set the "complete" flag if the end of the EPL program is reached.
+ * Start by defining STIMULUS_QUEUE_SIZE which is the number of stimuli to queue up for
+ * the stimulus window.
  */
-
-// Number of stimuli to queue up for the stimulus window
 const STIMULUS_QUEUE_SIZE = 20;
-
 function fillStimulusQueue() {
   if (videoInfo === null) {
     throw new Error('Cannot fill stimulus queue when video info is null');
@@ -280,7 +280,6 @@ function fillStimulusQueue() {
  * wants to start running an EPL program. It contains the name of the program and seed
  * as the parameters.
  */
-
 ipc.on('startProgram', (_event, stringArg: string) => {
   // Parse the argument
   const startProgramArgs: StartProgram = JSON.parse(stringArg) as StartProgram;
@@ -302,16 +301,30 @@ ipc.on('startProgram', (_event, stringArg: string) => {
   stimulusQueue = [];
 
   // Compile, initialize the program, and fill the stimulus queue
-  program = compileEPL.compile(
-    videoInfo.programText,
-    videoInfo.seed,
-    videoInfo.width,
-    videoInfo.height,
-    '/data/'
-  );
+  try {
+    program = compileEPL.compile(
+      videoInfo.programText,
+      videoInfo.seed,
+      videoInfo.width,
+      videoInfo.height,
+      '/data/'
+    );
+  } catch (e) {
+    console.log('Error: ');
+    if (e instanceof Error) {
+      const error: Error = e as Error;
+      console.log(`  Name: ${error.name}`);
+      console.log(`  Message: ${error.message}`);
+      console.log(`  Stack: ${error.stack}`);
+    } else {
+      throw e;
+    }
+    return;
+  }
   if (program === null) {
     throw new Error('Failed to compile program');
   }
+
   program.initialize();
   fillStimulusQueue();
 
@@ -323,7 +336,6 @@ ipc.on('startProgram', (_event, stringArg: string) => {
  * The "getVideoInfo" IPC function will be called by the stimulus window to retrieve
  * details for the video we're recording.
  */
-
 ipc.on('getVideoInfo', (event) => {
   event.returnValue = JSON.stringify(videoInfo);
 });
@@ -333,7 +345,6 @@ ipc.on('getVideoInfo', (event) => {
  * the next batch of stimuli. It will return the next batch or an empty array if the
  * program has finished.
  */
-
 ipc.on('getStimulusBatch', (event) => {
   // Return an empty batch if the program is complete.
   if (videoInfo === null) {
@@ -371,7 +382,6 @@ ipc.on('getStimulusBatch', (event) => {
  * closed while the second recreates the control window when the dock icon is
  * clicked if no other windows are open.
  */
-
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
