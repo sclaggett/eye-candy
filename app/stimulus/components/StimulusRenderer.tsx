@@ -104,7 +104,9 @@ export default class StimulusRenderer extends React.Component<
         if (this.state.videoInfo === null) {
           throw new Error('Video info missing');
         }
-        console.log(`Creating stimulus: ${JSON.stringify(currentStimulus)}`);
+        console.log(
+          `Creating stimulus: ${JSON.stringify(this.state.stimulusQueue[0])}`
+        );
         currentStimulus = StimulusFactory.createStimulus(
           this.state.stimulusQueue[0],
           this.state.videoInfo

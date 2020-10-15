@@ -1,28 +1,20 @@
 // const native = require('./build/Release/native.node');
 const native = require('bindings')('native');
 
-function test() {
-  console.log('## Test', native.hello());
+function initialize(ffmpegPath) {
+  return native.initialize(ffmpegPath);
 }
 
-function test2() {
-  console.log('## Test2', native.add(5, 10));
+function open(filePath) {
+  return native.open(filePath);
 }
 
-/*
-console.log('hello ', testAddon.hello());
-console.log('add ', testAddon.add(5, 10));
+function write() {
+  return native.write();
+}
 
-const prevInstance = new testAddon.ClassExample(4.3);
-console.log('Initial value : ', prevInstance.getValue());
-console.log('After adding 3.3 : ', prevInstance.add(3.3));
+function close() {
+  return native.close();
+}
 
-const newFromExisting = new testAddon.ClassExample(prevInstance);
-
-console.log('Testing class initial value for derived instance');
-console.log(newFromExisting.getValue());
-
-module.exports = testAddon;
-*/
-
-export { test, test2 };
+export { initialize, open, write, close };

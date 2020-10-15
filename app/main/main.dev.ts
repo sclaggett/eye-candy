@@ -22,8 +22,6 @@ import Stimulus from '../common/stimuli/Stimulus';
 import VideoInfo from '../common/VideoInfo';
 
 const ipc = require('electron').ipcMain;
-const native = require('native');
-const compileEPL = require('./epl/compile');
 
 let controlWindow: BrowserWindow | null = null;
 let stimulusWindow: BrowserWindow | null = null;
@@ -150,6 +148,8 @@ const createControlWindow = async () => {
 /*
  * Define an asychronous function that creates the offscreen stimulus window.
  */
+const fs = require('fs');
+// Temp
 const createStimulusWindow = async () => {
   if (
     process.env.NODE_ENV === 'development' ||
@@ -189,13 +189,36 @@ const createStimulusWindow = async () => {
 
   // This function will be invoked for each frame that is rendered by the
   // stimlulus window.
+  let frame = 0;
+  const frames: nativeImage[] = [];
   stimulusWindow.webContents.on(
     'paint',
-    (_event: Event, _dirty: Rectangle, _image: nativeImage) => {
-      /*
-      if (controlWindow === null) {
-        return
+    (_event: Event, _dirty: Rectangle, image: nativeImage) => {
+      if (stimulusWindow === null || controlWindow === null) {
+        return;
       }
+      if (frame < 300) {
+        frames.push(image);
+        frame += 1;
+        return;
+      }
+
+      console.log('Closing stimulus window');
+      stimulusWindow.close();
+      stimulusWindow = null;
+
+      console.log('Saving frames');
+      for (let i = 0; i < frames.length; i += 1) {
+        const filename = `/Users/Shane/Downloads/frames/${i}.png`;
+        fs.writeFile(filename, frames[i].toPNG(), function (err) {
+          if (err) {
+            throw err;
+          }
+          console.log(`Saved ${filename}`);
+        });
+      }
+
+      /*
       let size: Size = image.getSize();
       controlWindow.webContents.send('previewBitmap', '', //image.toBitmap(),
         size.width, size.height);
@@ -210,15 +233,11 @@ const createStimulusWindow = async () => {
  */
 app.disableHardwareAcceleration();
 
-// const testNative = require('../../native/build/Release/native.node');
-// const testNative = require("bindings")("native");
-native.test();
+// Temp: Test native integration
+const native = require('native');
+const compileEPL = require('./epl/compile');
 
-/*
-var PACKAGE_JSON = path.join(__dirname, 'package.json');
-var binding_path = binary.find(path.resolve(PACKAGE_JSON));
-var SerialPortBinding = require(binding_path);
-*/
+console.log(`Initializing: ${native.initialize('/usr/local/bin/ffmpeg')}`);
 
 /**
  * The starting point for an electron application is when the ready event is
@@ -283,6 +302,7 @@ function fillStimulusQueue() {
       throw new Error('Program response did not contain a stimulus');
     }
     stimulusQueue.push(response.value);
+    console.log(`Stimulus: ${JSON.stringify(response.value)}`);
   }
 }
 

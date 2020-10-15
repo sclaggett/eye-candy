@@ -181,6 +181,12 @@ $ cd eye-candy
 $ yarn
 ```
 
+Build the native code:
+
+```sh
+$ yarn electron-rebuild
+```
+
 Build and launch the application in development mode:
 
 ```sh

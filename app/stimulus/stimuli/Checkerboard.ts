@@ -12,11 +12,6 @@ export default class Checkerboard extends StimulusBase {
   }
 
   render(context: CanvasRenderingContext2D) {
-    this.frameNumber += 1;
-    if (this.frameNumber !== 1) {
-      return;
-    }
-
     context.save();
     this.renderBackground(context);
 
@@ -71,5 +66,9 @@ export default class Checkerboard extends StimulusBase {
     }
 
     context.restore();
+    context.fillStyle = 'red';
+    context.font = '16px Arial';
+    context.fillText(`Checkerboard ${this.frameNumber}`, 30, 30);
+    this.frameNumber += 1;
   }
 }

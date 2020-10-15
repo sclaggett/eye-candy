@@ -93,7 +93,7 @@ for (let size of sizes) {
     }
 }
 
-stimuli = stimuli.slice(1, 100); // Temp
+stimuli = stimuli.slice(1, 7); // Temp
 
 r.shuffle(stimuli)
 
