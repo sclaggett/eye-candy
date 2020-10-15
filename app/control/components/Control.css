@@ -28,6 +28,8 @@
   flex: 2;
   padding-right: 10px;
   height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .columnRight {
@@ -61,7 +63,7 @@
 }
 
 .inputNarrow {
-  width: 10em;
+  width: 3em;
 }
 
 .dirSelect {
@@ -75,16 +77,39 @@
   padding-left: 15px;
 }
 
-.preview {
-  height: 400px;
-  background-color: #ccc;
-  margin-top: 10px;
-  margin-bottom: 10px;
+.videoFormatText {
+  margin-right: 5px;
+  margin-left: 5px;
+}
+
+.buttons {
+  display: flex;
+  flex: 1;
+  justify-content: center;
 }
 
 .button {
+  width: 5em;
+  margin-left: 5px;
+  margin-right: 5px;
+}
+
+.log {
+  margin-top: 5px;
+  flex: 1;
   display: flex;
-  justify-content: center;
+}
+
+.logTextArea {
+  width: 100%;
+  resize: none;
+}
+
+.preview {
+  height: 200px;
+  background-color: #ccc;
+  margin-top: 5px;
+  margin-bottom: 5px;
 }
 
 .programNames {

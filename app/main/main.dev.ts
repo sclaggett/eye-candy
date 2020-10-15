@@ -22,6 +22,7 @@ import Stimulus from '../common/stimuli/Stimulus';
 import VideoInfo from '../common/VideoInfo';
 
 const ipc = require('electron').ipcMain;
+const { execFileSync } = require('child_process');
 
 let controlWindow: BrowserWindow | null = null;
 let stimulusWindow: BrowserWindow | null = null;
@@ -189,35 +190,14 @@ const createStimulusWindow = async () => {
 
   // This function will be invoked for each frame that is rendered by the
   // stimlulus window.
-  let frame = 0;
-  const frames: nativeImage[] = [];
+  // let frame = 0;
+  // const frames: nativeImage[] = [];
   stimulusWindow.webContents.on(
     'paint',
-    (_event: Event, _dirty: Rectangle, image: nativeImage) => {
-      if (stimulusWindow === null || controlWindow === null) {
-        return;
-      }
-      if (frame < 300) {
-        frames.push(image);
-        frame += 1;
-        return;
-      }
-
-      console.log('Closing stimulus window');
-      stimulusWindow.close();
-      stimulusWindow = null;
-
-      console.log('Saving frames');
-      for (let i = 0; i < frames.length; i += 1) {
-        const filename = `/Users/Shane/Downloads/frames/${i}.png`;
-        fs.writeFile(filename, frames[i].toPNG(), function (err) {
-          if (err) {
-            throw err;
-          }
-          console.log(`Saved ${filename}`);
-        });
-      }
-
+    (_event: Event, _dirty: Rectangle, _image: nativeImage) => {
+      // frames.push(image);
+      // frame += 1;
+      // log(`Captured frame ${frame}\n`);
       /*
       let size: Size = image.getSize();
       controlWindow.webContents.send('previewBitmap', '', //image.toBitmap(),
@@ -238,6 +218,36 @@ const native = require('native');
 const compileEPL = require('./epl/compile');
 
 console.log(`Initializing: ${native.initialize('/usr/local/bin/ffmpeg')}`);
+
+/**
+ * The log() function passes the given string to the control window where it will be appended
+ * to the log text area.
+ */
+function log(message: string) {
+  if (controlWindow && controlWindow.webContents) {
+    controlWindow.webContents.send('log', message);
+  }
+}
+
+/**
+ * The runStopped() function cleans up any run in progress and notifies the control window.
+ */
+function runStopped() {
+  // Close the stimulus window
+  if (stimulusWindow) {
+    stimulusWindow.close();
+    stimulusWindow = null;
+  }
+
+  // Reset internal state variables
+  program = null;
+  stimulusQueue = [];
+
+  // Notify the control window
+  if (controlWindow && controlWindow.webContents) {
+    controlWindow.webContents.send('runStopped');
+  }
+}
 
 /**
  * The starting point for an electron application is when the ready event is
@@ -276,62 +286,33 @@ ipc.on('selectOutputDirectory', (event, initialDirectory: string) => {
 });
 
 /**
- * The fillStimulusQueue() function attempts to fill the queue with a fixed number
- * of stimuli. It will set the "complete" flag if the end of the EPL program is reached.
- * Start by defining STIMULUS_QUEUE_SIZE which is the number of stimuli to queue up for
- * the stimulus window.
+ * The "startProgram" IPC function is where all the action happens when the user wants
+ * to compile and optionally start an EPL program.
+ *
+ * Many of the steps in this process can lock up the entire application by consuming
+ * the main thread. We keep the application responsive by pausing frequently to allow
+ * the UI to update. What follows are functions representing steps in the process and
+ * the final function that pulls them all together.
  */
-const STIMULUS_QUEUE_SIZE = 20;
-function fillStimulusQueue() {
-  if (videoInfo === null) {
-    throw new Error('Cannot fill stimulus queue when video info is null');
-  }
-  if (videoInfo.complete) {
-    return;
-  }
-  if (program === null) {
-    throw new Error('Unable to fill stimulus queue, program is null');
-  }
-  for (let i = 0; i < STIMULUS_QUEUE_SIZE; i += 1) {
-    const response: ProgramNext = program.next() as ProgramNext;
-    if (response.done) {
-      videoInfo.complete = true;
-      return;
-    }
-    if (response.value === null) {
-      throw new Error('Program response did not contain a stimulus');
-    }
-    stimulusQueue.push(response.value);
-    console.log(`Stimulus: ${JSON.stringify(response.value)}`);
-  }
-}
-
-/**
- * The "startProgram" IPC function will be called by the control window when the user
- * wants to start running an EPL program. It contains the name of the program and seed
- * as the parameters.
- */
-ipc.on('startProgram', (_event, stringArg: string) => {
-  // Parse the argument
-  const startProgramArgs: StartProgram = JSON.parse(stringArg) as StartProgram;
-
+function setState(args: StartProgram) {
   // Copy the arguments to the video info
   videoInfo = new VideoInfo();
-  videoInfo.outputDirectory = startProgramArgs.outputDirectory;
-  videoInfo.rootFileName = startProgramArgs.rootFileName;
-  videoInfo.programName = startProgramArgs.programName;
-  videoInfo.programText = startProgramArgs.programText;
-  videoInfo.seed = startProgramArgs.seed;
-  videoInfo.width = startProgramArgs.width;
-  videoInfo.height = startProgramArgs.height;
-  videoInfo.fps = startProgramArgs.fps;
-
-  // Reset our internal state variables
-  stimulusWindow = null;
-  program = null;
-  stimulusQueue = [];
-
-  // Compile, initialize the program, and fill the stimulus queue
+  videoInfo.outputDirectory = args.outputDirectory;
+  videoInfo.rootFileName = args.rootFileName;
+  videoInfo.programName = args.programName;
+  videoInfo.programText = args.programText;
+  videoInfo.seed = args.seed;
+  videoInfo.width = args.width;
+  videoInfo.height = args.height;
+  videoInfo.ffmpegPath = args.ffmpegPath;
+  videoInfo.fps = args.fps;
+}
+function compileProgram() {
+  // Compile and initialize the program
+  if (!videoInfo) {
+    throw new Error('Video info not defined');
+  }
+  log(`Compiling ${videoInfo.programName}... `);
   try {
     program = compileEPL.compile(
       videoInfo.programText,
@@ -340,27 +321,154 @@ ipc.on('startProgram', (_event, stringArg: string) => {
       videoInfo.height,
       '/data/'
     );
+    if (program === null) {
+      throw new Error('Failed to compile program');
+    }
   } catch (e) {
-    console.log('Error: ');
     if (e instanceof Error) {
       const error: Error = e as Error;
-      console.log(`  Name: ${error.name}`);
-      console.log(`  Message: ${error.message}`);
-      console.log(`  Stack: ${error.stack}`);
+      let message = 'Error:\n';
+      message += `  Name: ${error.name}\n`;
+      message += `  Message: ${error.message}\n`;
+      message += `  Stack: ${error.stack}\n`;
+      log(message);
     } else {
       throw e;
     }
+    return false;
+  }
+  program.initialize();
+  log('success\n');
+  log('Generating stimuli... ');
+  return true;
+}
+function generateStimuli() {
+  // Generate all stimuli and keep track of the total duration
+  if (!program) {
+    throw new Error('Program not defined');
+  }
+  let durationSecs = 0;
+  while (true) {
+    const response: ProgramNext = program.next() as ProgramNext;
+    if (response.done) {
+      break;
+    }
+    if (response.value === null) {
+      throw new Error('Program response did not contain a stimulus');
+    }
+    const stimulus: Stimulus = response.value as Stimulus;
+    durationSecs += stimulus.lifespan;
+    stimulusQueue.push(stimulus);
+  }
+
+  // Log the total duration
+  const secs: number = durationSecs % 60;
+  const durationMin: number = (durationSecs - secs) / 60;
+  const min: number = durationMin % 60;
+  const hrs: number = (durationMin - min) / 60;
+  let duration = '';
+  if (hrs > 0) {
+    duration += `${hrs} hours, `;
+  }
+  if (hrs > 0 || min > 0) {
+    duration += `${min} mins, `;
+  }
+  duration += `${secs.toFixed(1)} sec`;
+  log(`${stimulusQueue.length} total, ${duration}\n`);
+}
+function checkFFmpeg() {
+  // Check the executable path
+  if (!videoInfo) {
+    throw new Error('Video info not defined');
+  }
+  log('Checking FFmpeg executable... ');
+  try {
+    fs.accessSync(videoInfo.ffmpegPath, fs.constants.X_OK);
+  } catch (err) {
+    log(`failed to find executable at ${videoInfo.ffmpegPath}\n`);
+    return false;
+  }
+  log(`found at ${videoInfo.ffmpegPath}\n`);
+
+  // Check the FFmpeg version
+  log('Detecting FFmpeg version... ');
+  const result: string = execFileSync(videoInfo.ffmpegPath, [
+    'hide_banner',
+    '-version',
+  ]);
+  const lines = result.toString().split(/\r?\n/);
+  let version = '';
+  for (let i = 0; i < lines.length; i += 1) {
+    if (lines[i].includes('ffmpeg version')) {
+      const words = lines[i].split(' ');
+      const { 2: ver } = words;
+      version = ver;
+    }
+  }
+  if (version === '') {
+    log('failed to detect version\n');
+    return false;
+  }
+  log(`${version}\n`);
+
+  return true;
+}
+ipc.on('startProgram', (_event, stringArg: string) => {
+  // Deserialize the arguments
+  const args: StartProgram = JSON.parse(stringArg) as StartProgram;
+
+  // Set up the state and compile the program
+  setState(args);
+  if (!compileProgram()) {
+    runStopped();
     return;
   }
-  if (program === null) {
-    throw new Error('Failed to compile program');
-  }
 
-  program.initialize();
-  fillStimulusQueue();
+  // Wait 200 ms and generate all stimuli
+  setTimeout(function () {
+    generateStimuli();
 
-  // Create the stimulus window
-  createStimulusWindow();
+    // Stop here if we're only compiling
+    if (args.compileOnly) {
+      runStopped();
+      return;
+    }
+
+    // Check out the FFmpeg executable
+    if (!checkFFmpeg()) {
+      runStopped();
+      return;
+    }
+
+    // Wait 200 ms and create the stimulus window
+    log('Creating stimulus window... ');
+    setTimeout(function () {
+      createStimulusWindow();
+      log('done\n');
+    }, 200);
+  }, 200);
+});
+
+/**
+ * The "cancelProgram" IPC function will be called by the control window when the user
+ * wants to cancel the running EPL program.
+ */
+ipc.on('cancelProgram', (_event) => {
+  log('Program terminated\n');
+  runStopped();
+});
+
+/**
+ * The "endProgram" IPC function will be called by the stimulus window when it has
+ * run out of stimuli to render.
+ */
+ipc.on('endProgram', (_event) => {
+  // TODO: Don't stop until the expected number of frames have been received. First
+  // investigate what the extraneous frames coming off the window are
+  setTimeout(function () {
+    log('Program complete\n');
+    runStopped();
+  }, 500);
 });
 
 /**
@@ -376,35 +484,27 @@ ipc.on('getVideoInfo', (event) => {
  * the next batch of stimuli. It will return the next batch or an empty array if the
  * program has finished.
  */
+const BATCH_SIZE = 50;
 ipc.on('getStimulusBatch', (event) => {
   // Return an empty batch if the program is complete.
   if (videoInfo === null) {
     throw new Error('Cannot get stimulus batch when video info is null');
   }
-  if (videoInfo.complete) {
+  if (stimulusQueue.length === 0) {
     event.returnValue = [];
     return;
-  }
-
-  // Synchronously fill the stimulus queue if it's empty. Note that this shouldn't happen
-  // under normal operating conditions.
-  if (stimulusQueue.length === 0) {
-    fillStimulusQueue();
   }
 
   // The structured cloning algorithm has problems serializing stimuli for some reason. Work
   // around this by converting each object to a JSON string and parsing them to the correct
   // type on the receiving end.
   const duplicateQueue: string[] = [];
-  for (let i = 0; i < stimulusQueue.length; i += 1) {
+  let i = 0;
+  for (i = 0; i < stimulusQueue.length && i < BATCH_SIZE; i += 1) {
     duplicateQueue.push(JSON.stringify(stimulusQueue[i]));
   }
   event.returnValue = duplicateQueue;
-
-  // Clear the stimulus queue and schedule it to be filled asynchronously so we have data
-  // ready for a future call.
-  stimulusQueue = [];
-  setTimeout(fillStimulusQueue, 0);
+  stimulusQueue = stimulusQueue.slice(i);
 });
 
 /**

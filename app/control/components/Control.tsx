@@ -13,49 +13,50 @@ type ControlProps = {
 type ControlState = {
   outputDirectory: string;
   rootFileName: string;
-  programNames: string[];
-  selectedProgramName: string;
-  programText: string;
   width: number;
   height: number;
   fps: number;
+  ffmpegPath: string;
   seed: number;
+  log: string;
   running: boolean;
-  /*
-  previewData: string | null;
-  previewWidth: number;
-  previewHeight: number;
-  */
+  programNames: string[];
+  selectedProgramName: string;
+  programText: string;
 };
 
 export default class Control extends React.Component<
   ControlProps,
   ControlState
 > {
+  logTextArea: React.RefObject<HTMLTextAreaElement>;
+
   constructor(props: ControlProps) {
     super(props);
     this.state = {
-      outputDirectory: '',
-      rootFileName: '',
-      programNames: ['New'],
-      selectedProgramName: 'New',
-      programText: '',
+      outputDirectory: '/Users/Shane/Desktop/EyeCandyData',
+      rootFileName: 'test',
       width: 1024,
       height: 720,
       fps: 30,
-      seed: 0,
+      ffmpegPath: '/usr/local/bin/ffmpeg',
+      seed: 108,
+      log: '',
       running: false,
-      /*
-      previewData: null,
-      previewWidth: 0,
-      previewHeight: 0,
-      */
+      programNames: ['New'],
+      selectedProgramName: 'New',
+      programText: '',
     };
 
-    // Bind the onPreviewBitmap() handler so "this" will be defined when it is invoked
-    // and listen for "previewBitmap" IPC calls
-    this.onPreviewBitmap = this.onPreviewBitmap.bind(this);
-    ipc.on('previewBitmap', this.onPreviewBitmap);
+    // Create a reference for the log text area so we can scroll it to the bottom
+    this.logTextArea = React.createRef();
+
+    // Bind the IPC handlers so "this" will be defined when they are invoked and listen
+    // for IPC calls
+    this.onLog = this.onLog.bind(this);
+    ipc.on('log', this.onLog);
+    this.onRunStopped = this.onRunStopped.bind(this);
+    ipc.on('runStopped', this.onRunStopped);
   }
 
   /*
@@ -77,6 +78,20 @@ export default class Control extends React.Component<
         programNames: prevState.programNames.concat(programNames),
       }));
     });
+  }
+
+  /*
+   * The componentDidUpdate() function is invoked immediately after updating occurs and
+   * is a good place for us to update the log text area scroll position.
+   */
+  componentDidUpdate() {
+    if (
+      this.logTextArea.current &&
+      this.logTextArea.current.scrollTop !==
+        this.logTextArea.current.scrollHeight
+    ) {
+      this.logTextArea.current.scrollTop = this.logTextArea.current.scrollHeight;
+    }
   }
 
   /*
@@ -164,40 +179,55 @@ export default class Control extends React.Component<
   }
 
   /*
-   * The onPreviewBitmap() function will be invoked by the main process when a stimulus
-   * preview bitmap is available to display to the user.
+   * The onLog() function will be invoked by the main process when it has a message to
+   * append to the log text area.
    */
-  onPreviewBitmap(
-    _event: IpcRendererEvent,
-    _data: string,
-    _width: number,
-    _height: number
-  ) {
-    // console.log('## onPreviewBitmap');
-    /*
-    this.setState({
-      previewData: data,
-      previewWidth: width,
-      previewHeight: height,
-    });
-    */
+  onLog(_event: IpcRendererEvent, message: string) {
+    this.setState((prevState) => ({
+      log: prevState.log + message,
+    }));
   }
 
-  onButtonClick() {
-    if (!this.state.running) {
-      const args: StartProgram = new StartProgram();
-      args.outputDirectory = this.state.outputDirectory;
-      args.rootFileName = this.state.rootFileName;
-      args.programName = this.state.selectedProgramName;
-      args.programText = this.state.programText.toString();
-      args.seed = this.state.seed;
-      args.width = this.state.width;
-      args.height = this.state.height;
-      args.fps = this.state.fps;
-      ipc.send('startProgram', JSON.stringify(args));
-    } else {
-      console.log('## Cancel program');
-    }
+  /*
+   * The onRunStopped() function will be invoked by the main process when the run has
+   * stopped due to completion or failure.
+   */
+  onRunStopped(_event: IpcRendererEvent) {
+    this.setState((prevState) => ({
+      log: `${prevState.log}\n`,
+      running: false,
+    }));
+  }
+
+  /*
+   * The following two functions will be invoked when the user clicks the Compile/Start
+   * buttons or the Stop button. In both cases, the signals will be passed to the main
+   * process.
+   */
+  onStartButtonClick(event: React.MouseEvent<HTMLInputElement, MouseEvent>) {
+    // Create an instance of the StartProgram arguments
+    const args: StartProgram = new StartProgram();
+    args.outputDirectory = this.state.outputDirectory;
+    args.rootFileName = this.state.rootFileName;
+    args.programName = this.state.selectedProgramName;
+    args.programText = this.state.programText.toString();
+    args.seed = this.state.seed;
+    args.width = this.state.width;
+    args.height = this.state.height;
+    args.ffmpegPath = this.state.ffmpegPath;
+    args.fps = this.state.fps;
+    args.compileOnly =
+      event.target && (event.target as HTMLInputElement).value === 'Compile';
+    ipc.send('startProgram', JSON.stringify(args));
+
+    // Set the state to running so the UI will lock until the main process releases it
+    this.setState(({
+      running: true,
+    } as unknown) as ControlState);
+  }
+
+  onStopButtonClick() {
+    ipc.send('cancelProgram');
   }
 
   /*
@@ -205,9 +235,6 @@ export default class Control extends React.Component<
    * that should be displayed and the framework will update the output as necessary.
    */
   render() {
-    // Set the button label based on whether we're currently running.
-    const buttonLabel: string = this.state.running ? 'Cancel' : 'Start';
-
     // Check if we're not ready to start running.
     const notReadyToRun: boolean =
       this.state.outputDirectory.length === 0 ||
@@ -262,7 +289,7 @@ export default class Control extends React.Component<
               </div>
             </div>
             <div className={styles.row}>
-              <div className={styles.field}>Width:</div>
+              <div className={styles.field}>Video format:</div>
               <div className={styles.value}>
                 <input
                   className={styles.inputNarrow}
@@ -272,11 +299,7 @@ export default class Control extends React.Component<
                   disabled={this.state.running}
                   onChange={this.onInputChange.bind(this)}
                 />
-              </div>
-            </div>
-            <div className={styles.row}>
-              <div className={styles.field}>Height:</div>
-              <div className={styles.value}>
+                <div className={styles.videoFormatText}>x</div>
                 <input
                   className={styles.inputNarrow}
                   type="text"
@@ -285,11 +308,7 @@ export default class Control extends React.Component<
                   disabled={this.state.running}
                   onChange={this.onInputChange.bind(this)}
                 />
-              </div>
-            </div>
-            <div className={styles.row}>
-              <div className={styles.field}>Frames per second:</div>
-              <div className={styles.value}>
+                <div className={styles.videoFormatText}>@</div>
                 <input
                   className={styles.inputNarrow}
                   type="text"
@@ -298,10 +317,12 @@ export default class Control extends React.Component<
                   disabled={this.state.running}
                   onChange={this.onInputChange.bind(this)}
                 />
+                <div className={styles.videoFormatText}>fps</div>
+                [x]
               </div>
             </div>
             <div className={styles.row}>
-              <div className={styles.field}>Seed:</div>
+              <div className={styles.field}>Randomizer seed:</div>
               <div className={styles.value}>
                 <input
                   className={styles.inputNarrow}
@@ -313,15 +334,42 @@ export default class Control extends React.Component<
                 />
               </div>
             </div>
-            <div className={styles.preview} />
-            <div className={styles.button}>
-              <input
-                type="button"
-                value={buttonLabel}
-                disabled={notReadyToRun}
-                onClick={this.onButtonClick.bind(this)}
+            <div className={styles.row}>
+              <div className={styles.buttons}>
+                <input
+                  className={styles.button}
+                  type="button"
+                  value="Compile"
+                  disabled={notReadyToRun || this.state.running}
+                  onClick={this.onStartButtonClick.bind(this)}
+                />
+                <input
+                  className={styles.button}
+                  type="button"
+                  value="Run"
+                  disabled={notReadyToRun || this.state.running}
+                  onClick={this.onStartButtonClick.bind(this)}
+                />
+                <input
+                  className={styles.button}
+                  type="button"
+                  value="Stop"
+                  disabled={notReadyToRun || !this.state.running}
+                  onClick={this.onStopButtonClick.bind(this)}
+                />
+              </div>
+            </div>
+            <div className={styles.log}>
+              <textarea
+                className={styles.logTextArea}
+                ref={this.logTextArea}
+                name="programText"
+                value={this.state.log}
+                readOnly
+                onChange={this.onTextAreaChange.bind(this)}
               />
             </div>
+            <div className={styles.preview} />
           </div>
           <div className={styles.columnRight}>
             <div className={styles.row}>

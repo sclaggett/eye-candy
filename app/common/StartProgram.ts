@@ -15,7 +15,11 @@ export default class StartProgram {
 
   height: number;
 
+  ffmpegPath: string;
+
   fps: number;
+
+  compileOnly: boolean;
 
   constructor() {
     this.outputDirectory = '';
@@ -25,6 +29,8 @@ export default class StartProgram {
     this.seed = 0;
     this.width = 0;
     this.height = 0;
+    this.ffmpegPath = '';
     this.fps = 0;
+    this.compileOnly = false;
   }
 }

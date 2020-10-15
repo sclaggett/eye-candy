@@ -17,7 +17,7 @@ type StimulusRendererProps = {
  *     queue. Also, for frame 1, the component doesn't have a reference to the canvas
  *     element yet. These first two frames need to be discarded by the encoder.
  *  2. Running: Stimuli are being rendered to the browser window at exactly one stimulus
- *     per frame.
+ *     tick per frame.
  *  3. Complete: The program is complete and no more stimuli exist to be rendered.
  */
 enum LifecycleStage {
@@ -35,15 +35,13 @@ type StimulusRendererState = {
 
 // The next batch of stimuli will be retrieved from the main process when our queue reaches
 // this level.
-const STIMULUS_RELOAD_THRESHOLD = 10;
+const STIMULUS_RELOAD_THRESHOLD = 25;
 
 export default class StimulusRenderer extends React.Component<
   StimulusRendererProps,
   StimulusRendererState
 > {
   canvasRef: React.RefObject<HTMLCanvasElement>;
-
-  frameCount: number; // Temp
 
   constructor(props: StimulusRendererProps) {
     super(props);
@@ -58,8 +56,6 @@ export default class StimulusRenderer extends React.Component<
     this.onAnimationFrame = this.onAnimationFrame.bind(this);
 
     this.canvasRef = React.createRef<HTMLCanvasElement>();
-
-    this.frameCount = 0; // Temp
   }
 
   /*
@@ -77,9 +73,9 @@ export default class StimulusRenderer extends React.Component<
 
   /*
    * The onAnimationFrame() function is invoked by the browser before it renders the next
-   * frame. It's the mechanism to use because we want to display one stimulus per frame
-   * without having to worry about the number of frames per second that the browser is
-   * running at. Copy the next stimulus from the queue to the state which will trigger a
+   * frame. It's the mechanism to use because we want to display one stimulus tick per
+   * frame without having to worry about the number of frames per second that the browser
+   * is running at. Copy the next stimulus from the queue to the state which will trigger a
    * call to render().
    */
   onAnimationFrame(_timestamp: number) {
@@ -120,6 +116,8 @@ export default class StimulusRenderer extends React.Component<
         this.setState({
           stimulus: null,
         });
+        ipc.send('endProgram');
+        return;
       }
     }
 

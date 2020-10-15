@@ -15,9 +15,9 @@ export default class VideoInfo {
 
   height: number;
 
-  fps: number;
+  ffmpegPath: string;
 
-  complete: boolean;
+  fps: number;
 
   constructor() {
     this.outputDirectory = '';
@@ -27,7 +27,7 @@ export default class VideoInfo {
     this.seed = 0;
     this.width = 0;
     this.height = 0;
+    this.ffmpegPath = '';
     this.fps = 0;
-    this.complete = false;
   }
 }

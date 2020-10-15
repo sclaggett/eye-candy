@@ -1,4 +1,6 @@
+import Stimulus from '../../common/stimuli/Stimulus';
 import StimulusBase from './StimulusBase';
+import VideoInfo from '../../common/VideoInfo';
 
 export default class Solid extends StimulusBase {
   constructor(stimulus: Stimulus, videoInfo: VideoInfo) {
