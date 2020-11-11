@@ -2,7 +2,6 @@
 
 TODO:
 
-- Estimate duration for program
 - FFHQ
 
 ## Acuity

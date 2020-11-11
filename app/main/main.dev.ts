@@ -21,8 +21,11 @@ import StartProgram from '../common/StartProgram';
 import Stimulus from '../common/stimuli/Stimulus';
 import VideoInfo from '../common/VideoInfo';
 
-const ipc = require('electron').ipcMain;
 const { execFileSync } = require('child_process');
+const fs = require('fs');
+const ipc = require('electron').ipcMain;
+const native = require('native');
+const compileEPL = require('./epl/compile');
 
 let controlWindow: BrowserWindow | null = null;
 let stimulusWindow: BrowserWindow | null = null;
@@ -83,6 +86,92 @@ function onFileSave() {
 function onFileSaveAs() {
   console.log('## File save as');
 }
+
+/**
+ * The log() function passes the given string to the control window where it will be appended
+ * to the log text area.
+ */
+function log(message: string) {
+  if (controlWindow && controlWindow.webContents) {
+    controlWindow.webContents.send('log', message);
+  }
+}
+
+/**
+ * The runStopped() function cleans up any run in progress and notifies the control window.
+ */
+function runStopped() {
+  log(`## Run stopped\n`);
+  // Close the stimulus window
+  if (stimulusWindow) {
+    stimulusWindow.close();
+    stimulusWindow = null;
+  }
+
+  // Close out video encoding
+  native.close();
+
+  // Reset internal state variables
+  program = null;
+  stimulusQueue = [];
+
+  // Notify the control window
+  if (controlWindow && controlWindow.webContents) {
+    controlWindow.webContents.send('runStopped');
+  }
+}
+
+/**
+ * Stimulus frames that have been captured need to be passed to the native code for further
+ * processing, and while that is happening we need to retain a reference to the javascript
+ * object so it stays valid. The following variables and function keep track of which
+ * frames have been submitted for processing and purge completed frame from the list at
+ * 10 ms intervals.
+ */
+const pendingFrames: { [index: string]: any } = {};
+let frameCleanTimer: ReturnType<typeof setTimeout> | null = null;
+function startFrameCleanTimer() {
+  if (frameCleanTimer !== null) {
+    clearTimeout(frameCleanTimer);
+  }
+  frameCleanTimer = setTimeout(function () {
+    const completed: string[] = native.checkCompleted();
+    for (let i = 0; i < completed.length; i += 1) {
+      const id: string = completed[i];
+      if (id in pendingFrames) {
+        delete pendingFrames[id];
+      }
+    }
+    if (Object.keys(pendingFrames).length !== 0) {
+      startFrameCleanTimer();
+    } else if (videoInfo !== null) {
+      // TODO: Figure out exactly how many frames should be encoded and stop there. Discard
+      // the first two frames which we know aren't valid
+      console.log(
+        `## Checking frame number ${videoInfo.frameNumber} against count ${videoInfo.frameCount}`
+      );
+      if (videoInfo.frameNumber >= videoInfo.frameCount) {
+        log('Program complete\n');
+        runStopped();
+      }
+    }
+  }, 10);
+}
+function frameCaptured(image: nativeImage) {
+  const size = image.getSize();
+  const id: number = native.write(image.getBitmap(), size.width, size.height);
+  pendingFrames[id] = image;
+  if (videoInfo !== null) {
+    videoInfo.frameNumber += 1;
+  }
+  startFrameCleanTimer();
+}
+
+/**
+ * We don't use WebGL or 3D CSS animations so disable hardware acceleration to avoid
+ * the overhead of compositing on the GPU.
+ */
+app.disableHardwareAcceleration();
 
 /*
  * Define an asychronous function that creates the control window.
@@ -149,8 +238,6 @@ const createControlWindow = async () => {
 /*
  * Define an asychronous function that creates the offscreen stimulus window.
  */
-const fs = require('fs');
-// Temp
 const createStimulusWindow = async () => {
   if (
     process.env.NODE_ENV === 'development' ||
@@ -190,64 +277,13 @@ const createStimulusWindow = async () => {
 
   // This function will be invoked for each frame that is rendered by the
   // stimlulus window.
-  // let frame = 0;
-  // const frames: nativeImage[] = [];
   stimulusWindow.webContents.on(
     'paint',
-    (_event: Event, _dirty: Rectangle, _image: nativeImage) => {
-      // frames.push(image);
-      // frame += 1;
-      // log(`Captured frame ${frame}\n`);
-      /*
-      let size: Size = image.getSize();
-      controlWindow.webContents.send('previewBitmap', '', //image.toBitmap(),
-        size.width, size.height);
-      */
+    (_event: Event, _dirty: Rectangle, image: nativeImage) => {
+      frameCaptured(image);
     }
   );
 };
-
-/**
- * We don't make use of WebGL or 3D CSS animations so disable hardware acceleration to
- * avoid the overhead of compositing on the GPU.
- */
-app.disableHardwareAcceleration();
-
-// Temp: Test native integration
-const native = require('native');
-const compileEPL = require('./epl/compile');
-
-console.log(`Initializing: ${native.initialize('/usr/local/bin/ffmpeg')}`);
-
-/**
- * The log() function passes the given string to the control window where it will be appended
- * to the log text area.
- */
-function log(message: string) {
-  if (controlWindow && controlWindow.webContents) {
-    controlWindow.webContents.send('log', message);
-  }
-}
-
-/**
- * The runStopped() function cleans up any run in progress and notifies the control window.
- */
-function runStopped() {
-  // Close the stimulus window
-  if (stimulusWindow) {
-    stimulusWindow.close();
-    stimulusWindow = null;
-  }
-
-  // Reset internal state variables
-  program = null;
-  stimulusQueue = [];
-
-  // Notify the control window
-  if (controlWindow && controlWindow.webContents) {
-    controlWindow.webContents.send('runStopped');
-  }
-}
 
 /**
  * The starting point for an electron application is when the ready event is
@@ -286,8 +322,8 @@ ipc.on('selectOutputDirectory', (event, initialDirectory: string) => {
 });
 
 /**
- * The "startProgram" IPC function is where all the action happens when the user wants
- * to compile and optionally start an EPL program.
+ * The "startProgram" IPC function is invoked when the user wants to compile and
+ * optionally start an EPL program. This is where all the action happens.
  *
  * Many of the steps in this process can lock up the entire application by consuming
  * the main thread. We keep the application responsive by pausing frequently to allow
@@ -306,6 +342,10 @@ function setState(args: StartProgram) {
   videoInfo.height = args.height;
   videoInfo.ffmpegPath = args.ffmpegPath;
   videoInfo.fps = args.fps;
+  videoInfo.outputPath = path.join(
+    videoInfo.outputDirectory,
+    `${videoInfo.rootFileName}.mp4`
+  );
 }
 function compileProgram() {
   // Compile and initialize the program
@@ -343,7 +383,9 @@ function compileProgram() {
   return true;
 }
 function generateStimuli() {
-  // Generate all stimuli and keep track of the total duration
+  // Generate all stimuli and keep track of the total duration. Note that this process may
+  // need to be broken down into multiple steps for longer programs to prevent locking up
+  // the application for longer periods of time.
   if (!program) {
     throw new Error('Program not defined');
   }
@@ -375,6 +417,11 @@ function generateStimuli() {
   }
   duration += `${secs.toFixed(1)} sec`;
   log(`${stimulusQueue.length} total, ${duration}\n`);
+
+  // Calculate the total number of frames we expect
+  if (videoInfo !== null) {
+    videoInfo.frameCount = durationSecs * videoInfo.fps;
+  }
 }
 function checkFFmpeg() {
   // Check the executable path
@@ -388,15 +435,15 @@ function checkFFmpeg() {
     log(`failed to find executable at ${videoInfo.ffmpegPath}\n`);
     return false;
   }
-  log(`found at ${videoInfo.ffmpegPath}\n`);
+  log(`found\n`);
 
   // Check the FFmpeg version
   log('Detecting FFmpeg version... ');
-  const result: string = execFileSync(videoInfo.ffmpegPath, [
-    'hide_banner',
+  let result: string = execFileSync(videoInfo.ffmpegPath, [
+    '-hide_banner',
     '-version',
   ]);
-  const lines = result.toString().split(/\r?\n/);
+  let lines = result.toString().split(/\r?\n/);
   let version = '';
   for (let i = 0; i < lines.length; i += 1) {
     if (lines[i].includes('ffmpeg version')) {
@@ -411,13 +458,84 @@ function checkFFmpeg() {
   }
   log(`${version}\n`);
 
+  // We prefer to use a specialized hardware chip to encode H.264 video if one is
+  // available. Determine the name of the hardware encoder by checking the platform
+  let hwEncoder = '';
+  if (process.platform === 'darwin') {
+    hwEncoder = 'h264_videotoolbox';
+  }
+  const swEncoder = 'libx264';
+
+  // Check if ffmpeg supports the hardware and software encoders
+  log('Detecting H.264 encoders... ');
+  result = execFileSync(videoInfo.ffmpegPath, ['-hide_banner', '-encoders']);
+  lines = result.toString().split(/\r?\n/);
+  let hwEncoderFound = false;
+  let swEncoderFound = false;
+  for (let i = 0; i < lines.length; i += 1) {
+    if (hwEncoder !== '' && lines[i].includes(hwEncoder)) {
+      hwEncoderFound = true;
+    }
+    if (lines[i].includes(swEncoder)) {
+      swEncoderFound = true;
+    }
+  }
+  if (hwEncoderFound) {
+    log('hardware encoder found\n');
+    videoInfo.encoder = hwEncoder;
+  } else if (swEncoderFound) {
+    log('hardware encoder not found, falling back to software encoding\n');
+    videoInfo.encoder = swEncoder;
+  } else {
+    log('failed\n');
+    return false;
+  }
+
+  // Make sure ffmpeg supports the mp4 file format
+  log('Checking output format... ');
+  result = execFileSync(videoInfo.ffmpegPath, ['-hide_banner', '-muxers']);
+  lines = result.toString().split(/\r?\n/);
+  let mp4FormatFound = false;
+  for (let i = 0; i < lines.length; i += 1) {
+    if (lines[i].includes('mp4')) {
+      mp4FormatFound = true;
+      break;
+    }
+  }
+  if (mp4FormatFound) {
+    log('success\n');
+  } else {
+    log('failed\n');
+    return false;
+  }
+
   return true;
+}
+function spawnFFmpeg() {
+  // Initialize the native library with the location of ffmpeg and open the output
+  // file for writing
+  if (videoInfo === null) {
+    return false;
+  }
+  native.initialize(videoInfo.ffmpegPath);
+  const result: string = native.open(
+    videoInfo.width,
+    videoInfo.height,
+    videoInfo.fps,
+    videoInfo.encoder,
+    videoInfo.outputPath
+  );
+  if (result === '') {
+    return true;
+  }
+  log(`${result}\n`);
+  return false;
 }
 ipc.on('startProgram', (_event, stringArg: string) => {
   // Deserialize the arguments
   const args: StartProgram = JSON.parse(stringArg) as StartProgram;
 
-  // Set up the state and compile the program
+  // Set the state and compile the program
   setState(args);
   if (!compileProgram()) {
     runStopped();
@@ -434,8 +552,8 @@ ipc.on('startProgram', (_event, stringArg: string) => {
       return;
     }
 
-    // Check out the FFmpeg executable
-    if (!checkFFmpeg()) {
+    // Check the FFmpeg executable and spawn it
+    if (!checkFFmpeg() || !spawnFFmpeg()) {
       runStopped();
       return;
     }
@@ -460,16 +578,10 @@ ipc.on('cancelProgram', (_event) => {
 
 /**
  * The "endProgram" IPC function will be called by the stimulus window when it has
- * run out of stimuli to render.
+ * run out of stimuli to render. This function simply sets the flag and the encoding
+ * process will be closed once all frames have been processed.
  */
-ipc.on('endProgram', (_event) => {
-  // TODO: Don't stop until the expected number of frames have been received. First
-  // investigate what the extraneous frames coming off the window are
-  setTimeout(function () {
-    log('Program complete\n');
-    runStopped();
-  }, 500);
-});
+ipc.on('endProgram', (_event) => {});
 
 /**
  * The "getVideoInfo" IPC function will be called by the stimulus window to retrieve
@@ -513,6 +625,7 @@ ipc.on('getStimulusBatch', (event) => {
  * closed while the second recreates the control window when the dock icon is
  * clicked if no other windows are open.
  */
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();

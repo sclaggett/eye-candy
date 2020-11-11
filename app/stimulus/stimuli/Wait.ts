@@ -17,7 +17,7 @@ export default class Wait extends StimulusBase {
     context.restore();
     context.fillStyle = 'red';
     context.font = '16px Arial';
-    context.fillText(`Solid ${this.frameNumber}`, 30, 30);
+    context.fillText(`Wait ${this.frameNumber}`, 30, 30);
     this.frameNumber += 1;
   }
 }

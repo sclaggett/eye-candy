@@ -2,19 +2,23 @@
 const native = require('bindings')('native');
 
 function initialize(ffmpegPath) {
-  return native.initialize(ffmpegPath);
+  native.initialize(ffmpegPath);
 }
 
-function open(filePath) {
-  return native.open(filePath);
+function open(width, height, fps, encoder, outputPath) {
+  return native.open(width, height, fps, encoder, outputPath);
 }
 
-function write() {
-  return native.write();
+function write(buffer, width, height) {
+  return native.write(buffer, width, height);
+}
+
+function checkCompleted() {
+  return native.checkCompleted();
 }
 
 function close() {
-  return native.close();
+  native.close();
 }
 
-export { initialize, open, write, close };
+export { initialize, open, write, checkCompleted, close };
