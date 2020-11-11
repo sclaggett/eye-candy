@@ -24,7 +24,7 @@ import VideoInfo from '../common/VideoInfo';
 const { execFileSync } = require('child_process');
 const fs = require('fs');
 const ipc = require('electron').ipcMain;
-const native = require('native');
+const eyeNative = require('eye-native');
 const compileEPL = require('./epl/compile');
 
 let controlWindow: BrowserWindow | null = null;
@@ -109,7 +109,7 @@ function runStopped() {
   }
 
   // Close out video encoding
-  native.close();
+  eyeNative.close();
 
   // Reset internal state variables
   program = null;
@@ -135,7 +135,7 @@ function startFrameCleanTimer() {
     clearTimeout(frameCleanTimer);
   }
   frameCleanTimer = setTimeout(function () {
-    const completed: string[] = native.checkCompleted();
+    const completed: string[] = eyeNative.checkCompleted();
     for (let i = 0; i < completed.length; i += 1) {
       const id: string = completed[i];
       if (id in pendingFrames) {
@@ -159,7 +159,11 @@ function startFrameCleanTimer() {
 }
 function frameCaptured(image: nativeImage) {
   const size = image.getSize();
-  const id: number = native.write(image.getBitmap(), size.width, size.height);
+  const id: number = eyeNative.write(
+    image.getBitmap(),
+    size.width,
+    size.height
+  );
   pendingFrames[id] = image;
   if (videoInfo !== null) {
     videoInfo.frameNumber += 1;
@@ -517,8 +521,8 @@ function spawnFFmpeg() {
   if (videoInfo === null) {
     return false;
   }
-  native.initialize(videoInfo.ffmpegPath);
-  const result: string = native.open(
+  eyeNative.initialize(videoInfo.ffmpegPath);
+  const result: string = eyeNative.open(
     videoInfo.width,
     videoInfo.height,
     videoInfo.fps,
