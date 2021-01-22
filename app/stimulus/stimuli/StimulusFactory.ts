@@ -1,5 +1,6 @@
 import Bar from './Bar';
 import Checkerboard from './Checkerboard';
+import Chirp from './Chirp';
 import Solid from './Solid';
 import Stimulus from '../../common/stimuli/Stimulus';
 import VideoInfo from '../../common/VideoInfo';
@@ -13,6 +14,9 @@ export default class StimulusFactory {
 
       case 'CHECKERBOARD':
         return new Checkerboard(stimulus, videoInfo);
+
+      case 'CHIRP':
+        return new Chirp(stimulus, videoInfo);
 
       case 'SOLID':
         return new Solid(stimulus, videoInfo);

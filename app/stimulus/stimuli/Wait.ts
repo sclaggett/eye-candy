@@ -5,6 +5,7 @@ import VideoInfo from '../../common/VideoInfo';
 export default class Wait extends StimulusBase {
   constructor(stimulus: Stimulus, videoInfo: VideoInfo) {
     super(stimulus, videoInfo);
+
     console.log(
       `Created Wait stimulus which will run for ${stimulus.lifespan} seconds at ${videoInfo.fps} fps for a total of ${this.frameCount} frames`
     );

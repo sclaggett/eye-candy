@@ -8,7 +8,10 @@ module.exports = {
     // true way to write code
     'react/destructuring-assignment': 'off',
     'class-methods-use-this': 'off',
-    '@typescript-eslint/no-empty-interface': 0,
+    '@typescript-eslint/no-empty-interface': 'off',
+
+    // Not sure why the default is to assume JS developers don't do bitwise operations
+    'no-bitwise': 'off',
   },
   parserOptions: {
     ecmaVersion: 2020,

@@ -9,18 +9,69 @@ export default class Bar extends StimulusBase {
   constructor(stimulus: Stimulus, videoInfo: VideoInfo) {
     super(stimulus, videoInfo);
     this.barStimulus = stimulus as BarStimulus;
+
+    console.log(
+      `Created Bar stimulus which will run for ${stimulus.lifespan} seconds at ${videoInfo.fps} fps for a total of ${this.frameCount} frames`
+    );
   }
 
   render(context: CanvasRenderingContext2D) {
-    this.frameNumber += 1;
-    if (this.frameNumber !== 1) {
-      return;
-    }
-
     context.save();
     this.renderBackground(context);
 
+    const timeDelta = this.frameNumber * (1 / this.videoInfo.fps);
+    const diagonalLength = this.getDiagonalLength(context);
+
+    let position;
+    if (this.frameNumber === 0) {
+      position = {
+        r: diagonalLength / 2,
+        theta: -this.barStimulus.angle,
+      };
+    } else {
+      position = {
+        r: this.prevPosition.r - this.barStimulus.speed * timeDelta,
+        theta: this.prevPosition.theta,
+      };
+    }
+
+    const x =
+      (this.barStimulus.width / 2) * Math.cos(position.theta) +
+      position.r * Math.cos(position.theta) +
+      context.canvas.clientWidth / 2;
+    const y =
+      (this.barStimulus.width / 2) * Math.sin(position.theta) +
+      position.r * Math.sin(position.theta) +
+      context.canvas.clientHeight / 2;
+
+    console.log(
+      `Rendering bar, timeDelta = ${timeDelta}, diagonalLength = ${diagonalLength}, position = ${JSON.stringify(
+        position
+      )}, x = ${x}, y = ${y}`
+    );
+
     /*
+    // might need to translate first if rotation
+    context.translate(x, y);
+    context.fillStyle = this.barStimulus.barColor;
+    // Rotate rectangle to be perpendicular with Center of Canvas
+    context.rotate(position.theta);
+    // Draw a rectangle, adjusting for Bar width
+    context.fillRect(Math.round(-this.barStimulus / 2), Math.round(-diagonalLength / 2),
+      this.barStimulus.width, diagonalLength);
+    */
+
+    this.prevPosition = position;
+
+    context.restore();
+    context.fillStyle = 'red';
+    context.font = '16px Arial';
+    context.fillText(`Bar ${this.frameNumber}`, 30, 30);
+    this.frameNumber += 1;
+  }
+}
+
+/*
     const canvasPattern: HTMLCanvasElement = document.createElement('canvas');
     canvasPattern.width = this.checkerboardStimulus.size * 2;
     canvasPattern.height = this.checkerboardStimulus.size * 2;
@@ -70,28 +121,6 @@ export default class Bar extends StimulusBase {
       context.translate(-diag / 2, -diag / 2);
       context.fillRect(0, 0, diag, diag);
     }
-    */
-
-    context.restore();
-  }
-}
-
-/*
-            if (stimulus.age === 0) {
-                // console.log("len is 0")
-                barDispatcher(stimulus.lifespan, stimulus.width, stimulus.barColor, stimulus.backgroundColor,
-                    stimulus.speed, stimulus.angle)
-            }
-
-function barDispatcher(lifespan, width, barColor, backgroundColor, speed, angle,
-    startR=getDiagonalLength()/2) {
-
-    store.dispatch(addGraphicAC({
-        graphicType: GRAPHIC.BAR, age: 0, color: barColor, size: {width: width,
-            height: getDiagonalLength()}, speed: speed, angle: angle,
-            lifespan: lifespan, startR: startR
-    }))
-}
 
 function tickBar(state, bar, timeDelta) {
     let newPosition = undefined
@@ -114,16 +143,29 @@ function tickBar(state, bar, timeDelta) {
     })
 }
 
-
 export function renderBar(context, graphic) {
+
+  const diagonalLength = getDiagonalLength();
+
+  if (frameNumber == 0) {
+    position = {r: diagonalLength/2, theta: -bar.angle}
+  } else {
+    position = {r: bar.prevPosition.r - (bar.speed * timeDelta),
+            theta: bar.prevPosition.theta}
+  }
+
+  x = bar.size.width/2*cos(position.theta) + newPosition.r*cos(position.theta) +
+    state["windowWidth"]/2;
+  y = bar.size.width/2*sin(position.theta) + newPosition.r*sin(position.theta) +
+    state["windowHeight"]/2;
+
     // might need to translate first if rotation
-    context.translate(graphic.origin.x,
-        graphic.origin.y)
+    context.translate(x, y)
     context.fillStyle = graphic.color
     // Rotate rectangle to be perpendicular with Center of Canvas
-    context.rotate(graphic.position.theta)
+    context.rotate(position.theta)
     // Draw a rectangle, adjusting for Bar width
-    context.fillRect(Math.round(-graphic.size.width/2), Math.round(-graphic.size.height/2),
-        graphic.size.width, graphic.size.height)
+    context.fillRect(Math.round(-bar.size.width/2), Math.round(-diagonalLength/2),
+        bar.size.width, diagonalLength)
 }
 */

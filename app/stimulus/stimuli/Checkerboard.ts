@@ -9,6 +9,10 @@ export default class Checkerboard extends StimulusBase {
   constructor(stimulus: Stimulus, videoInfo: VideoInfo) {
     super(stimulus, videoInfo);
     this.checkerboardStimulus = stimulus as CheckerboardStimulus;
+
+    console.log(
+      `Created Checkerboard stimulus which will run for ${stimulus.lifespan} seconds at ${videoInfo.fps} fps for a total of ${this.frameCount} frames`
+    );
   }
 
   render(context: CanvasRenderingContext2D) {
