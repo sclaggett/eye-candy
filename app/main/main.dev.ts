@@ -27,6 +27,10 @@ const ipc = require('electron').ipcMain;
 const eyeNative = require('eye-native');
 const compileEPL = require('./epl/compile');
 
+// Load the native library and remember the module root so we can pass it to the control
+// window when we set up the preview channel
+const eyeNativeModuleRoot = eyeNative.getModuleRoot();
+
 let controlWindow: BrowserWindow | null = null;
 let stimulusWindow: BrowserWindow | null = null;
 
@@ -101,7 +105,6 @@ function log(message: string) {
  * The runStopped() function cleans up any run in progress and notifies the control window.
  */
 function runStopped() {
-  log(`## Run stopped\n`);
   // Close the stimulus window
   if (stimulusWindow) {
     stimulusWindow.close();
@@ -109,7 +112,7 @@ function runStopped() {
   }
 
   // Close out video encoding
-  eyeNative.close();
+  eyeNative.closeVideoOutput();
 
   // Reset internal state variables
   program = null;
@@ -135,7 +138,7 @@ function startFrameCleanTimer() {
     clearTimeout(frameCleanTimer);
   }
   frameCleanTimer = setTimeout(function () {
-    const completed: string[] = eyeNative.checkCompleted();
+    const completed: string[] = eyeNative.checkCompletedFrames();
     for (let i = 0; i < completed.length; i += 1) {
       const id: string = completed[i];
       if (id in pendingFrames) {
@@ -159,7 +162,7 @@ function startFrameCleanTimer() {
 }
 function frameCaptured(image: nativeImage) {
   const size = image.getSize();
-  const id: number = eyeNative.write(
+  const id: number = eyeNative.queueNextFrame(
     image.getBitmap(),
     size.width,
     size.height
@@ -521,19 +524,29 @@ function spawnFFmpeg() {
   if (videoInfo === null) {
     return false;
   }
-  eyeNative.initialize(videoInfo.ffmpegPath);
-  const result: string = eyeNative.open(
+  eyeNative.initializeFfmpeg(videoInfo.ffmpegPath);
+  const result: string = eyeNative.createVideoOutput(
     videoInfo.width,
     videoInfo.height,
     videoInfo.fps,
     videoInfo.encoder,
     videoInfo.outputPath
   );
-  if (result === '') {
-    return true;
+  if (result !== '') {
+    log(`${result}\n`);
+    return false;
   }
-  log(`${result}\n`);
-  return false;
+
+  // Create the preview channel and pass it and the module root to the control window
+  const channelName = eyeNative.createPreviewChannel();
+  if (controlWindow && controlWindow.webContents) {
+    controlWindow.webContents.send(
+      'runPreviewChannel',
+      eyeNativeModuleRoot,
+      channelName
+    );
+  }
+  return true;
 }
 ipc.on('startProgram', (_event, stringArg: string) => {
   // Deserialize the arguments

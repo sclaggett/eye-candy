@@ -6298,7 +6298,7 @@ extsprintf@1.3.0, extsprintf@^1.2.0:
 
 eye-native@sclaggett/eye-native.git:
   version "0.0.5"
-  resolved "https://codeload.github.com/sclaggett/eye-native/tar.gz/868af084da96da56a9fe78e30fa021748dd83fbf"
+  resolved "https://codeload.github.com/sclaggett/eye-native/tar.gz/dc4c2e0ead732d803e86c85c915f9f63a18e86c5"
   dependencies:
     bindings "^1.5.0"
     node-addon-api "^1.3.0"

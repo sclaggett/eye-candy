@@ -105,11 +105,29 @@
   resize: none;
 }
 
-.preview {
+.previewOuter {
   height: 200px;
   background-color: #ccc;
   margin-top: 5px;
   margin-bottom: 5px;
+  position: relative;
+}
+
+.previewInner {
+  position: absolute;
+}
+
+.previewImage {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 .programNames {

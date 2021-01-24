@@ -4,7 +4,12 @@ import * as styles from './Control.css';
 import StartProgram from '../../common/StartProgram';
 
 const ipc = require('electron').ipcRenderer;
+const { nativeImage } = require('electron');
 const fs = require('fs');
+
+// Require the eye-native library but remember that we can't use it in a renderer
+// process until the main process notifies us of the module root
+const eyeNative = require('eye-native');
 
 type ControlProps = {
   dummy: string;
@@ -20,6 +25,11 @@ type ControlState = {
   seed: number;
   log: string;
   running: boolean;
+  imageUrl: string;
+  imageTop: number;
+  imageLeft: number;
+  imageWidth: number;
+  imageHeight: number;
   programNames: string[];
   selectedProgramName: string;
   programText: string;
@@ -30,6 +40,10 @@ export default class Control extends React.Component<
   ControlState
 > {
   logTextArea: React.RefObject<HTMLTextAreaElement>;
+
+  previewContainer: React.RefObject<HTMLTextAreaElement>;
+
+  previewInterval: number;
 
   constructor(props: ControlProps) {
     super(props);
@@ -43,19 +57,31 @@ export default class Control extends React.Component<
       seed: 108,
       log: '',
       running: false,
+      imageUrl: '',
+      imageTop: 0,
+      imageLeft: 0,
+      imageWidth: 0,
+      imageHeight: 0,
       programNames: ['New'],
       selectedProgramName: 'New',
       programText: '',
     };
 
-    // Create a reference for the log text area so we can scroll it to the bottom
+    // Initialize variables
     this.logTextArea = React.createRef();
+    this.previewContainer = React.createRef();
+    this.previewInterval = 0;
 
-    // Bind the IPC handlers so "this" will be defined when they are invoked and listen
-    // for IPC calls
+    // Bind the IPC handlers and other callbacks so "this" will be defined when
+    // they are invoked
     this.onLog = this.onLog.bind(this);
-    ipc.on('log', this.onLog);
+    this.onRunPreviewChannel = this.onRunPreviewChannel.bind(this);
+    this.onPreviewInterval = this.onPreviewInterval.bind(this);
     this.onRunStopped = this.onRunStopped.bind(this);
+
+    // Listen for IPC calls
+    ipc.on('log', this.onLog);
+    ipc.on('runPreviewChannel', this.onRunPreviewChannel);
     ipc.on('runStopped', this.onRunStopped);
   }
 
@@ -118,6 +144,127 @@ export default class Control extends React.Component<
   }
 
   /*
+   * The onDirectorySelectClick() callback is invoked when the user wants to select
+   * the output directory. Pass the event to the main process using IPC.
+   */
+  onDirectorySelectClick() {
+    const selectedDirectory: string | null = ipc.sendSync(
+      'selectOutputDirectory',
+      this.state.outputDirectory
+    );
+    if (selectedDirectory !== null) {
+      this.setState({
+        outputDirectory: selectedDirectory,
+      });
+    }
+  }
+
+  /*
+   * The following two functions will be invoked when the user clicks the Compile/Start
+   * buttons or the Stop button. In both cases, the signals will be passed to the main
+   * process.
+   */
+  onStartButtonClick(event: React.MouseEvent<HTMLInputElement, MouseEvent>) {
+    // Create an instance of the StartProgram arguments
+    const args: StartProgram = new StartProgram();
+    args.outputDirectory = this.state.outputDirectory;
+    args.rootFileName = this.state.rootFileName;
+    args.programName = this.state.selectedProgramName;
+    args.programText = this.state.programText.toString();
+    args.seed = this.state.seed;
+    args.width = this.state.width;
+    args.height = this.state.height;
+    args.ffmpegPath = this.state.ffmpegPath;
+    args.fps = this.state.fps;
+    args.compileOnly =
+      event.target && (event.target as HTMLInputElement).value === 'Compile';
+    ipc.send('startProgram', JSON.stringify(args));
+
+    // Set the state to running so the UI will lock until the main process releases it
+    this.setState(({
+      running: true,
+    } as unknown) as ControlState);
+  }
+
+  onStopButtonClick() {
+    ipc.send('cancelProgram');
+  }
+
+  /*
+   * The onLog() function will be invoked by the main process when it has a message to
+   * append to the log text area.
+   */
+  onLog(_event: IpcRendererEvent, message: string) {
+    this.setState((prevState) => ({
+      log: prevState.log + message,
+    }));
+  }
+
+  /*
+   * The onRunPreviewChannel() function will be invoked by the main process when the
+   * run has started. It contains the root for the eye-native module and the name of
+   * the video preview channel.
+   */
+  onRunPreviewChannel(
+    _event: IpcRendererEvent,
+    moduleRoot: string,
+    channelName: string
+  ) {
+    // Set the module root to initialize the native library
+    eyeNative.setModuleRoot(moduleRoot);
+
+    // Open the preview channel and start calling onPreviewInterval() at an interval
+    // equivalent to twice the video rate.
+    const ret = eyeNative.openPreviewChannel(channelName);
+    if (ret !== '') {
+      const message = `Error opening preview channel: ${ret}\n`;
+      this.setState((prevState) => ({
+        log: prevState.log + message,
+      }));
+      return;
+    }
+    let timeout = 10;
+    if (this.state.fps !== 0) {
+      timeout = 1000 / this.state.fps / 2;
+    }
+    this.previewInterval = setInterval(this.onPreviewInterval, timeout);
+  }
+
+  /*
+   * The onPreviewInterval() function will be invoked a regular intervals while the
+   * program is being run and frames are being captured. It retrieves the latest frame
+   * from the native layer and displays it in the preview div.
+   */
+  onPreviewInterval() {
+    if (!this.previewContainer.current) {
+      console.log(`Missing preview container reference`);
+      return;
+    }
+    const ret = eyeNative.getNextFrame(
+      this.previewContainer.current.clientWidth,
+      this.previewContainer.current.clientHeight
+    );
+    if (ret === null) {
+      return;
+    }
+    if (!(ret instanceof Uint8Array)) {
+      console.log(
+        `Preview frame is an unexpected data type: ${ret.constructor.name}`
+      );
+      return;
+    }
+    const image = nativeImage.createFromBuffer(ret);
+    const size = image.getSize();
+    this.setState(({
+      imageUrl: image.toDataURL(),
+      imageTop: (this.previewContainer.current.clientHeight - size.height) / 2,
+      imageLeft: (this.previewContainer.current.clientWidth - size.width) / 2,
+      imageWidth: size.width,
+      imageHeight: size.height,
+    } as unknown) as ControlState);
+  }
+
+  /*
    * The onProgramSelected() callback is invoked when the user selects a program name from
    * the dropdown.
    */
@@ -163,71 +310,19 @@ export default class Control extends React.Component<
   }
 
   /*
-   * The onDirectorySelectClick() callback is invoked when the user wants to select
-   * the output directory. Pass the event to the main process using IPC.
-   */
-  onDirectorySelectClick() {
-    const selectedDirectory: string | null = ipc.sendSync(
-      'selectOutputDirectory',
-      this.state.outputDirectory
-    );
-    if (selectedDirectory !== null) {
-      this.setState({
-        outputDirectory: selectedDirectory,
-      });
-    }
-  }
-
-  /*
-   * The onLog() function will be invoked by the main process when it has a message to
-   * append to the log text area.
-   */
-  onLog(_event: IpcRendererEvent, message: string) {
-    this.setState((prevState) => ({
-      log: prevState.log + message,
-    }));
-  }
-
-  /*
    * The onRunStopped() function will be invoked by the main process when the run has
    * stopped due to completion or failure.
    */
   onRunStopped(_event: IpcRendererEvent) {
+    if (this.previewInterval !== 0) {
+      eyeNative.closePreviewChannel();
+      clearInterval(this.previewInterval);
+      this.previewInterval = 0;
+    }
     this.setState((prevState) => ({
       log: `${prevState.log}\n`,
       running: false,
     }));
-  }
-
-  /*
-   * The following two functions will be invoked when the user clicks the Compile/Start
-   * buttons or the Stop button. In both cases, the signals will be passed to the main
-   * process.
-   */
-  onStartButtonClick(event: React.MouseEvent<HTMLInputElement, MouseEvent>) {
-    // Create an instance of the StartProgram arguments
-    const args: StartProgram = new StartProgram();
-    args.outputDirectory = this.state.outputDirectory;
-    args.rootFileName = this.state.rootFileName;
-    args.programName = this.state.selectedProgramName;
-    args.programText = this.state.programText.toString();
-    args.seed = this.state.seed;
-    args.width = this.state.width;
-    args.height = this.state.height;
-    args.ffmpegPath = this.state.ffmpegPath;
-    args.fps = this.state.fps;
-    args.compileOnly =
-      event.target && (event.target as HTMLInputElement).value === 'Compile';
-    ipc.send('startProgram', JSON.stringify(args));
-
-    // Set the state to running so the UI will lock until the main process releases it
-    this.setState(({
-      running: true,
-    } as unknown) as ControlState);
-  }
-
-  onStopButtonClick() {
-    ipc.send('cancelProgram');
   }
 
   /*
@@ -243,6 +338,12 @@ export default class Control extends React.Component<
       this.state.width === 0 ||
       this.state.height === 0 ||
       this.state.fps === 0;
+    const previewContainerStyle = {
+      top: `${this.state.imageTop}px`,
+      left: `${this.state.imageLeft}px`,
+      width: `${this.state.imageWidth}px`,
+      height: `${this.state.imageHeight}px`,
+    };
 
     return (
       <div className={styles.container}>
@@ -369,7 +470,18 @@ export default class Control extends React.Component<
                 onChange={this.onTextAreaChange.bind(this)}
               />
             </div>
-            <div className={styles.preview} />
+            <div className={styles.previewOuter} ref={this.previewContainer}>
+              <div
+                className={styles.previewInner}
+                style={previewContainerStyle}
+              >
+                <img
+                  className={styles.previewImage}
+                  src={this.state.imageUrl}
+                  alt="Rain falling softly on the roof"
+                />
+              </div>
+            </div>
           </div>
           <div className={styles.columnRight}>
             <div className={styles.row}>
