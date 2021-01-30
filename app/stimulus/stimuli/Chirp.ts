@@ -55,7 +55,7 @@ export default class Chirp extends StimulusBase {
     context.restore();
     context.fillStyle = 'red';
     context.font = '16px Arial';
-    context.fillText(`Chirp ${this.frameNumber}`, 30, 30);
+    context.fillText(`Chirp ${this.frameNumber}`, 50, 50);
     this.frameNumber += 1;
   }
 }

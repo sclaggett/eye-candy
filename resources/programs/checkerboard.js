@@ -93,8 +93,6 @@ for (let size of sizes) {
     }
 }
 
-stimuli = stimuli.slice(1, 7); // Temp
-
 r.shuffle(stimuli)
 
 stimuli = measureIntegrity(flatten(stimuli))

@@ -17,7 +17,7 @@ export default class Solid extends StimulusBase {
     context.restore();
     context.fillStyle = 'red';
     context.font = '16px Arial';
-    context.fillText(`Solid ${this.frameNumber}`, 30, 30);
+    context.fillText(`Solid ${this.frameNumber}`, 50, 50);
     this.frameNumber += 1;
   }
 }

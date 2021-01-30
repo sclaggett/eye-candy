@@ -205,7 +205,11 @@ export default class StimulusRenderer extends React.Component<
 
     return (
       <div className={styles.containerRunning}>
-        <canvas ref={this.canvasRef} className={styles.stimulationCanvas} />
+        <canvas
+          ref={this.canvasRef}
+          width={this.state.videoInfo.width}
+          height={this.state.videoInfo.height}
+        />
       </div>
     );
   }

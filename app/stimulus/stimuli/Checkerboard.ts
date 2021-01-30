@@ -72,7 +72,7 @@ export default class Checkerboard extends StimulusBase {
     context.restore();
     context.fillStyle = 'red';
     context.font = '16px Arial';
-    context.fillText(`Checkerboard ${this.frameNumber}`, 30, 30);
+    context.fillText(`Checkerboard ${this.frameNumber}`, 50, 50);
     this.frameNumber += 1;
   }
 }

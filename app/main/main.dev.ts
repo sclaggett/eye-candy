@@ -397,7 +397,7 @@ function generateStimuli() {
     throw new Error('Program not defined');
   }
   let durationSecs = 0;
-  while (true) {
+  while (true && durationSecs < 30) {
     const response: ProgramNext = program.next() as ProgramNext;
     if (response.done) {
       break;
