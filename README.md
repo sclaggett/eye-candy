@@ -2,11 +2,7 @@
 
 TODO:
 
-- FFHQ
-
-## Acuity
-
-{"value":{"lifespan":2.16,"backgroundColor":"black","metadata":{"group":"ba8a3ecd-298b-44c4-b5cc-27a87b2a0d78"},"age":0,"stimulusType":"BAR","speed":500,"width":80,"angle":2.8797932657906435,"barColor":"white"},"done":false,"stimulusIndex":0}
+- Building on Windows.
 
 ## Grating
 

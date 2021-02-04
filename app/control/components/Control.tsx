@@ -41,9 +41,9 @@ export default class Control extends React.Component<
 > {
   logTextArea: React.RefObject<HTMLTextAreaElement>;
 
-  previewContainer: React.RefObject<HTMLTextAreaElement>;
+  previewContainer: React.RefObject<HTMLDivElement>;
 
-  previewInterval: number;
+  previewInterval: ReturnType<typeof setInterval> | null;
 
   constructor(props: ControlProps) {
     super(props);
@@ -70,7 +70,7 @@ export default class Control extends React.Component<
     // Initialize variables
     this.logTextArea = React.createRef();
     this.previewContainer = React.createRef();
-    this.previewInterval = 0;
+    this.previewInterval = null;
 
     // Bind the IPC handlers and other callbacks so "this" will be defined when
     // they are invoked
@@ -253,7 +253,7 @@ export default class Control extends React.Component<
       );
       return;
     }
-    const image = nativeImage.createFromBuffer(ret);
+    const image = nativeImage.createFromBuffer(Buffer.from(ret));
     const size = image.getSize();
     this.setState(({
       imageUrl: image.toDataURL(),
@@ -314,10 +314,10 @@ export default class Control extends React.Component<
    * stopped due to completion or failure.
    */
   onRunStopped(_event: IpcRendererEvent) {
-    if (this.previewInterval !== 0) {
+    if (this.previewInterval !== null) {
       eyeNative.closePreviewChannel();
       clearInterval(this.previewInterval);
-      this.previewInterval = 0;
+      this.previewInterval = null;
     }
     this.setState((prevState) => ({
       log: `${prevState.log}\n`,

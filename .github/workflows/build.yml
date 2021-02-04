@@ -28,7 +28,7 @@ jobs:
         run: |
           yarn electron-rebuild
 
-      - name: yarn test
+      - name: yarn package
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

@@ -47,7 +47,6 @@ export default class Chirp extends StimulusBase {
     }
 
     // stay centered around gray
-    let color;
     const colorVal = Math.round(amplitude * scale + 127.5);
     context.fillStyle = this.rgbToHex(colorVal, colorVal, colorVal);
     context.fillRect(0, 0, context.canvas.width, context.canvas.height);

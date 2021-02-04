@@ -203,13 +203,16 @@ export default class StimulusRenderer extends React.Component<
       throw new Error('Render loop starved for stimuli');
     }
 
+    let width = 0;
+    let height = 0;
+    if (this.state.videoInfo !== null) {
+      width = this.state.videoInfo.width;
+      height = this.state.videoInfo.height;
+    }
+
     return (
       <div className={styles.containerRunning}>
-        <canvas
-          ref={this.canvasRef}
-          width={this.state.videoInfo.width}
-          height={this.state.videoInfo.height}
-        />
+        <canvas ref={this.canvasRef} width={width} height={height} />
       </div>
     );
   }
