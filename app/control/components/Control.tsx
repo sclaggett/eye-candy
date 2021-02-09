@@ -47,20 +47,17 @@ export default class Control extends React.Component<
   constructor(props: ControlProps) {
     super(props);
 
-    // Set the initial output directory and FFmpeg path based on the operating system
-    let initOutputDirectory = '';
+    // Set the initial FFmpeg path based on the operating system
     let initFfmpegPath = '';
     if (process.platform === 'win32') {
-      initOutputDirectory = '%UserProfile%DesktopEyeCandyData';
-      initFfmpegPath = 'C:path\to\ffmpeg.exe';
+      initFfmpegPath = 'C:\\ffmpeg\\bin\\ffmpeg.exe';
     } else {
-      initOutputDirectory = '~/Desktop/EyeCandyData';
       initFfmpegPath = '/usr/local/bin/ffmpeg';
     }
 
     // Define the initial state
     this.state = {
-      outputDirectory: initOutputDirectory,
+      outputDirectory: '',
       rootFileName: 'test',
       width: 1024,
       height: 720,
@@ -99,11 +96,30 @@ export default class Control extends React.Component<
 
   /*
    * The componentDidMount() function is invoked when the component is mounted in the
-   * DOM and is a good spot to perform class initialization. Enumerate the EPL programs in
-   * the resources directory and save them to the state so they can be rendered
-   * as options in the drop down list below.
+   * DOM and is a good spot to perform class initialization. Get the user's home
+   * directory from the main process and set the initial output directory. Enumerate
+   * the EPL programs in the resources directory and save them to the state so they
+   * can be rendered as options in the drop down list below.
    */
   componentDidMount() {
+    ipcRenderer
+      .invoke('getHomeDirectory')
+      .then((homeDirectory) => {
+        let initOutputDirectory;
+        if (process.platform === 'win32') {
+          initOutputDirectory = `${homeDirectory}\\Desktop\\EyeCandyData`;
+        } else {
+          initOutputDirectory = `${homeDirectory}/Desktop/EyeCandyData`;
+        }
+        this.setState({
+          outputDirectory: initOutputDirectory,
+        });
+        return null;
+      })
+      .catch(() => {
+        console.log('Failed to get home directory');
+      });
+
     fs.readdir('./resources/programs', (err: Error, dir: string[]) => {
       if (err) {
         throw new Error(`Failed to read programs directory: ${err}`);

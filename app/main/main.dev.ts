@@ -27,8 +27,6 @@ const { ipcMain } = require('electron');
 const eyeNative = require('eye-native');
 const compileEPL = require('./epl/compile');
 
-console.log(`## Home directory: ${app.getPath('home')}`);
-
 // Load the native library and remember the module root so we can pass it to the control
 // window when we set up the preview channel
 const eyeNativeModuleRoot = eyeNative.getModuleRoot();
@@ -300,6 +298,14 @@ const createStimulusWindow = async () => {
  */
 app.on('ready', () => {
   createControlWindow();
+});
+
+/**
+ * The "getHomeDirectory" IPC function will be called by the control window when it
+ * wants to retrieve the current user's home directory.
+ */
+ipcMain.handle('getHomeDirectory', async (event) => {
+  return app.getPath('home');
 });
 
 /**
