@@ -23,7 +23,7 @@ import VideoInfo from '../common/VideoInfo';
 
 const { execFileSync } = require('child_process');
 const fs = require('fs');
-const { app, ipcMain } = require('electron');
+const { ipcMain } = require('electron');
 const eyeNative = require('eye-native');
 const compileEPL = require('./epl/compile');
 
