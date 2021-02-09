@@ -4,18 +4,19 @@
   right: 10px;
   top: 10px;
   bottom: 10px;
-  overflow-y: scroll;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
 }
 
 .logo {
-  overflow: auto;
+  overflow: hidden;
 }
 
 .logo img {
   width: 10vh;
   float: left;
+  height: 100%;
 }
 
 .columns {

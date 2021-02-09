@@ -541,7 +541,7 @@ export default class Control extends React.Component<
                 <img
                   className={styles.previewImage}
                   src={this.state.imageUrl}
-                  alt="Rain falling softly on the roof"
+                  alt=""
                 />
               </div>
             </div>
