@@ -1,6 +1,6 @@
 {
   "name": "eye-candy",
-  "version": "0.3.15",
+  "version": "0.3.16",
   "description": "Eye Candy stimulus generator",
   "main": "./main/main.prod.js",
   "author": {
