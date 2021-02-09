@@ -304,7 +304,7 @@ app.on('ready', () => {
  * The "getHomeDirectory" IPC function will be called by the control window when it
  * wants to retrieve the current user's home directory.
  */
-ipcMain.handle('getHomeDirectory', async (event) => {
+ipcMain.handle('getHomeDirectory', async (_event: Event) => {
   return app.getPath('home');
 });
 
