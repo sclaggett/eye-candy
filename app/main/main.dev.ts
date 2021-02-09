@@ -23,9 +23,11 @@ import VideoInfo from '../common/VideoInfo';
 
 const { execFileSync } = require('child_process');
 const fs = require('fs');
-const ipc = require('electron').ipcMain;
+const { app, ipcMain } = require('electron');
 const eyeNative = require('eye-native');
 const compileEPL = require('./epl/compile');
+
+console.log(`## Home directory: ${app.getPath('home')}`);
 
 // Load the native library and remember the module root so we can pass it to the control
 // window when we set up the preview channel
@@ -305,7 +307,7 @@ app.on('ready', () => {
  * the user wants to select the output directory. The currently selected directory or
  * an empty string will be passed as the parameter.
  */
-ipc.on('selectOutputDirectory', (event, initialDirectory: string) => {
+ipcMain.on('selectOutputDirectory', (event, initialDirectory: string) => {
   // Open a modal directory selection dialog
   if (controlWindow === null) {
     throw new Error(
@@ -321,6 +323,32 @@ ipc.on('selectOutputDirectory', (event, initialDirectory: string) => {
   );
 
   // Pass the selected directory to the control window
+  if (result !== undefined && result.length > 0) {
+    [event.returnValue] = result;
+  } else {
+    event.returnValue = null;
+  }
+});
+
+/**
+ * The "selectFfmpegPath" IPC function will be called by the control window when
+ * the user wants to select the ffmpeg executable. The currently selected path or
+ * an empty string will be passed as the parameter.
+ */
+ipcMain.on('selectFfmpegPath', (event, initialPath: string) => {
+  // Open a modal directory selection dialog
+  if (controlWindow === null) {
+    throw new Error('Cannot select ffmpeg path when control window is null');
+  }
+  const result: string[] | undefined = dialog.showOpenDialogSync(
+    controlWindow,
+    {
+      defaultPath: initialPath,
+      properties: ['openFile'],
+    }
+  );
+
+  // Pass the selected path to the control window
   if (result !== undefined && result.length > 0) {
     [event.returnValue] = result;
   } else {
@@ -548,7 +576,7 @@ function spawnFFmpeg() {
   }
   return true;
 }
-ipc.on('startProgram', (_event, stringArg: string) => {
+ipcMain.on('startProgram', (_event, stringArg: string) => {
   // Deserialize the arguments
   const args: StartProgram = JSON.parse(stringArg) as StartProgram;
 
@@ -588,7 +616,7 @@ ipc.on('startProgram', (_event, stringArg: string) => {
  * The "cancelProgram" IPC function will be called by the control window when the user
  * wants to cancel the running EPL program.
  */
-ipc.on('cancelProgram', (_event) => {
+ipcMain.on('cancelProgram', (_event) => {
   log('Program terminated\n');
   runStopped();
 });
@@ -598,13 +626,13 @@ ipc.on('cancelProgram', (_event) => {
  * run out of stimuli to render. This function simply sets the flag and the encoding
  * process will be closed once all frames have been processed.
  */
-ipc.on('endProgram', (_event) => {});
+ipcMain.on('endProgram', (_event) => {});
 
 /**
  * The "getVideoInfo" IPC function will be called by the stimulus window to retrieve
  * details for the video we're recording.
  */
-ipc.on('getVideoInfo', (event) => {
+ipcMain.on('getVideoInfo', (event) => {
   event.returnValue = JSON.stringify(videoInfo);
 });
 
@@ -614,7 +642,7 @@ ipc.on('getVideoInfo', (event) => {
  * program has finished.
  */
 const BATCH_SIZE = 50;
-ipc.on('getStimulusBatch', (event) => {
+ipcMain.on('getStimulusBatch', (event) => {
   // Return an empty batch if the program is complete.
   if (videoInfo === null) {
     throw new Error('Cannot get stimulus batch when video info is null');

@@ -3,8 +3,7 @@ import { IpcRendererEvent } from 'electron';
 import * as styles from './Control.css';
 import StartProgram from '../../common/StartProgram';
 
-const ipc = require('electron').ipcRenderer;
-const { nativeImage } = require('electron');
+const { ipcRenderer, nativeImage } = require('electron');
 const fs = require('fs');
 
 // Require the eye-native library but remember that we can't use it in a renderer
@@ -47,13 +46,26 @@ export default class Control extends React.Component<
 
   constructor(props: ControlProps) {
     super(props);
+
+    // Set the initial output directory and FFmpeg path based on the operating system
+    let initOutputDirectory = '';
+    let initFfmpegPath = '';
+    if (process.platform === 'win32') {
+      initOutputDirectory = '%UserProfile%DesktopEyeCandyData';
+      initFfmpegPath = 'C:path\to\ffmpeg.exe';
+    } else {
+      initOutputDirectory = '~/Desktop/EyeCandyData';
+      initFfmpegPath = '/usr/local/bin/ffmpeg';
+    }
+
+    // Define the initial state
     this.state = {
-      outputDirectory: '/Users/Shane/Desktop/EyeCandyData',
+      outputDirectory: initOutputDirectory,
       rootFileName: 'test',
       width: 1024,
       height: 720,
       fps: 30,
-      ffmpegPath: '/usr/local/bin/ffmpeg',
+      ffmpegPath: initFfmpegPath,
       seed: 108,
       log: '',
       running: false,
@@ -80,9 +92,9 @@ export default class Control extends React.Component<
     this.onRunStopped = this.onRunStopped.bind(this);
 
     // Listen for IPC calls
-    ipc.on('log', this.onLog);
-    ipc.on('runPreviewChannel', this.onRunPreviewChannel);
-    ipc.on('runStopped', this.onRunStopped);
+    ipcRenderer.on('log', this.onLog);
+    ipcRenderer.on('runPreviewChannel', this.onRunPreviewChannel);
+    ipcRenderer.on('runStopped', this.onRunStopped);
   }
 
   /*
@@ -148,13 +160,29 @@ export default class Control extends React.Component<
    * the output directory. Pass the event to the main process using IPC.
    */
   onDirectorySelectClick() {
-    const selectedDirectory: string | null = ipc.sendSync(
+    const selectedDirectory: string | null = ipcRenderer.sendSync(
       'selectOutputDirectory',
       this.state.outputDirectory
     );
     if (selectedDirectory !== null) {
       this.setState({
         outputDirectory: selectedDirectory,
+      });
+    }
+  }
+
+  /*
+   * In a similar fashion, the onFfmpegSelectClick() callback is invoked when the user
+   * wants to select the ffmpeg executable. Pass the event to the main process using IPC.
+   */
+  onFfmpegSelectClick() {
+    const selectedFfmpeg: string | null = ipcRenderer.sendSync(
+      'selectFfmpegPath',
+      this.state.ffmpegPath
+    );
+    if (selectedFfmpeg !== null) {
+      this.setState({
+        ffmpegPath: selectedFfmpeg,
       });
     }
   }
@@ -178,7 +206,7 @@ export default class Control extends React.Component<
     args.fps = this.state.fps;
     args.compileOnly =
       event.target && (event.target as HTMLInputElement).value === 'Compile';
-    ipc.send('startProgram', JSON.stringify(args));
+    ipcRenderer.send('startProgram', JSON.stringify(args));
 
     // Set the state to running so the UI will lock until the main process releases it
     this.setState(({
@@ -187,7 +215,7 @@ export default class Control extends React.Component<
   }
 
   onStopButtonClick() {
-    ipc.send('cancelProgram');
+    ipcRenderer.send('cancelProgram');
   }
 
   /*
@@ -373,6 +401,25 @@ export default class Control extends React.Component<
                   type="button"
                   disabled={this.state.running}
                   onClick={this.onDirectorySelectClick.bind(this)}
+                />
+              </div>
+            </div>
+            <div className={styles.row}>
+              <div className={styles.field}>Ffmpeg path:</div>
+              <div className={styles.value}>
+                <input
+                  className={styles.input}
+                  type="text"
+                  name="ffmpegPath"
+                  value={this.state.ffmpegPath}
+                  disabled={this.state.running}
+                  onChange={this.onInputChange.bind(this)}
+                />
+                <input
+                  className={styles.dirSelect}
+                  type="button"
+                  disabled={this.state.running}
+                  onClick={this.onFfmpegSelectClick.bind(this)}
                 />
               </div>
             </div>
