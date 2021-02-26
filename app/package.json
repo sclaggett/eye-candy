@@ -26,5 +26,7 @@
     "electron-rebuild": "node -r ../internals/scripts/BabelRegister.js ../internals/scripts/ElectronRebuild.js",
     "postinstall": "yarn electron-rebuild"
   },
-  "dependencies": {}
+  "dependencies": {
+    "eye-native": "sclaggett/eye-native.git"
+  }
 }

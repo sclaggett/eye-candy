@@ -36,6 +36,7 @@ node_modules
 release
 app/main/main.prod.js
 app/main/main.prod.js.map
+app/main/main.prod.js.LICENSE.txt
 app/renderer.prod.js
 app/renderer.prod.js.map
 app/style.css

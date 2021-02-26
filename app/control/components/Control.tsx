@@ -1,5 +1,6 @@
 import React from 'react';
 import { IpcRendererEvent } from 'electron';
+import path from 'path';
 import * as styles from './Control.css';
 import StartProgram from '../../common/StartProgram';
 
@@ -43,6 +44,8 @@ export default class Control extends React.Component<
   previewContainer: React.RefObject<HTMLDivElement>;
 
   previewInterval: ReturnType<typeof setInterval> | null;
+
+  programDirectory: string;
 
   constructor(props: ControlProps) {
     super(props);
@@ -120,18 +123,27 @@ export default class Control extends React.Component<
         console.log('Failed to get home directory');
       });
 
-    fs.readdir('./resources/programs', (err: Error, dir: string[]) => {
-      if (err) {
-        throw new Error(`Failed to read programs directory: ${err}`);
-      }
-      const programNames: string[] = [];
-      for (let i = 0; i < dir.length; i += 1) {
-        programNames.push(dir[i]);
-      }
-      this.setState((prevState) => ({
-        programNames: prevState.programNames.concat(programNames),
-      }));
-    });
+    ipcRenderer
+      .invoke('getProgramsDirectory')
+      .then((programDir) => {
+        this.programDirectory = programDir;
+        fs.readdir(this.programDirectory, (err: Error, dir: string[]) => {
+          if (err) {
+            throw new Error(`Failed to read programs directory: ${err}`);
+          }
+          const programNames: string[] = [];
+          for (let i = 0; i < dir.length; i += 1) {
+            programNames.push(dir[i]);
+          }
+          this.setState((prevState) => ({
+            programNames: prevState.programNames.concat(programNames),
+          }));
+        });
+        return null;
+      })
+      .catch(() => {
+        console.log('Failed to get programs directory');
+      });
   }
 
   /*
@@ -338,7 +350,7 @@ export default class Control extends React.Component<
 
     // Load the program from the file system
     fs.readFile(
-      `./resources/programs/${programName}`,
+      path.join(this.programDirectory, programName),
       (err: Error, data: string) => {
         // Make sure the file was loaded successfully
         if (err) {

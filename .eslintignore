@@ -55,7 +55,7 @@ package.json
 *.scss.d.ts
 
 # EPL programs
-resources/programs/**
+app/resources/programs/**
 
 # Old code (temporary)
 old/**

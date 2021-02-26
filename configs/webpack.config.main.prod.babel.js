@@ -36,6 +36,16 @@ export default merge.smart(baseConfig, {
             parallel: true,
             sourceMap: true,
             cache: true,
+            /**
+             * Added to work around a native module bug described here:
+             *  https://github.com/TooTallNate/node-bindings/issues/61
+             * Should be removed someday.
+             */
+            terserOptions: {
+              compress: {
+                reduce_vars: false,
+              },
+            },
           }),
         ],
   },

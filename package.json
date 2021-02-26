@@ -54,7 +54,8 @@
       "main/main.prod.js",
       "main/main.prod.js.map",
       "control/control.html",
-      "stimulus/stimulus.html"
+      "stimulus/stimulus.html",
+      "resources/programs/*"
     ],
     "dmg": {
       "contents": [
@@ -241,7 +242,6 @@
     "electron-debug": "^3.1.0",
     "electron-log": "^4.2.2",
     "electron-updater": "^4.3.1",
-    "eye-native": "sclaggett/eye-native.git",
     "history": "4.7.2",
     "mersennetwister": "^0.2.3",
     "ramda": "^0.27.1",

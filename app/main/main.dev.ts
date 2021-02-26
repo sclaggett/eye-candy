@@ -309,6 +309,14 @@ ipcMain.handle('getHomeDirectory', async (_event: Event) => {
 });
 
 /**
+ * The "getProgramsDirectory" IPC function will be called by the control window when
+ * it wants to retrieve the relative path to the programs directory.
+ */
+ipcMain.handle('getProgramsDirectory', async (_event: Event) => {
+  return path.join(__dirname, '../resources/programs');
+});
+
+/**
  * The "selectOutputDirectory" IPC function will be called by the control window when
  * the user wants to select the output directory. The currently selected directory or
  * an empty string will be passed as the parameter.
