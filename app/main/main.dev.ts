@@ -395,6 +395,9 @@ function setState(args: StartProgram) {
     videoInfo.outputDirectory,
     `${videoInfo.rootFileName}.mp4`
   );
+  if (!fs.existsSync(videoInfo.outputDirectory)) {
+    fs.mkdirSync(videoInfo.outputDirectory, { recursive: true });
+  }
 }
 function compileProgram() {
   // Compile and initialize the program
