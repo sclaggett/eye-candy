@@ -579,8 +579,7 @@ export default class Control extends React.Component<
                 className={styles.progress}
                 style={this.state.running ? {} : { visibility: 'hidden' }}
               >
-                {this.state.progress}
-                &percnt;
+                {`${this.state.progress.toString()}%`}
               </div>
             </div>
           </div>
