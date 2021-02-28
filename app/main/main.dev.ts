@@ -43,6 +43,10 @@ let program: Record<string, any> | null = null;
 // Queue of stimuli that haven't been played yet
 let stimulusQueue: Stimulus[] = [];
 
+// The stimulus window will produce two blank frames before the first image of
+// the program that it is running
+const PRE_FRAME_COUNT = 2;
+
 /*
  * Install tools to aid in development and debugging. We use the 'source-map-support'
  * library in production to produce useful stack traces and the 'electron-debug'
@@ -135,9 +139,10 @@ const pendingFrames: { [index: string]: any } = {};
 let frameCleanTimer: ReturnType<typeof setTimeout> | null = null;
 function startFrameCleanTimer() {
   if (frameCleanTimer !== null) {
-    clearTimeout(frameCleanTimer);
+    throw new Error('Frame clean time is already running');
+    return;
   }
-  frameCleanTimer = setTimeout(function () {
+  frameCleanTimer = setInterval(function () {
     const completed: string[] = eyeNative.checkCompletedFrames();
     for (let i = 0; i < completed.length; i += 1) {
       const id: string = completed[i];
@@ -145,22 +150,30 @@ function startFrameCleanTimer() {
         delete pendingFrames[id];
       }
     }
-    if (Object.keys(pendingFrames).length !== 0) {
-      startFrameCleanTimer();
-    } else if (videoInfo !== null) {
-      // TODO: Figure out exactly how many frames should be encoded and stop there. Discard
-      // the first two frames which we know aren't valid
-      console.log(
-        `## Checking frame number ${videoInfo.frameNumber} against count ${videoInfo.frameCount}`
-      );
-      if (videoInfo.frameNumber >= videoInfo.frameCount) {
-        log('Program complete\n');
-        runStopped();
-      }
+    if (
+      Object.keys(pendingFrames).length === 0 &&
+      videoInfo !== null &&
+      videoInfo.frameNumber >= videoInfo.frameCount
+    ) {
+      clearInterval(frameCleanTimer);
+      frameCleanTimer = null;
+      log('Program complete\n');
+      runStopped();
     }
-  }, 10);
+  }, 30);
 }
 function frameCaptured(image: nativeImage) {
+  // The stimulus window produces a series of blank frames before we get the first
+  // frame of the program which should be skipped
+  if (videoInfo === null) {
+    return;
+  }
+  if (videoInfo.frameNumber < PRE_FRAME_COUNT) {
+    videoInfo.frameNumber += 1;
+    return;
+  }
+
+  // Pass the image to the native layer and remember the ID that it is assigned
   const size = image.getSize();
   const id: number = eyeNative.queueNextFrame(
     image.getBitmap(),
@@ -168,10 +181,21 @@ function frameCaptured(image: nativeImage) {
     size.height
   );
   pendingFrames[id] = image;
-  if (videoInfo !== null) {
-    videoInfo.frameNumber += 1;
+
+  // Start the frame cleanup timer if this is the first frame
+  if (videoInfo.frameNumber === PRE_FRAME_COUNT) {
+    startFrameCleanTimer();
   }
-  startFrameCleanTimer();
+
+  // Notify the control window of our progress and increment the frame number
+  if (controlWindow && controlWindow.webContents) {
+    controlWindow.webContents.send(
+      'runProgress',
+      videoInfo.frameNumber - PRE_FRAME_COUNT,
+      videoInfo.frameCount - PRE_FRAME_COUNT
+    );
+  }
+  videoInfo.frameNumber += 1;
 }
 
 /**
@@ -472,7 +496,7 @@ function generateStimuli() {
 
   // Calculate the total number of frames we expect
   if (videoInfo !== null) {
-    videoInfo.frameCount = durationSecs * videoInfo.fps;
+    videoInfo.frameCount = PRE_FRAME_COUNT + durationSecs * videoInfo.fps;
   }
 }
 function checkFFmpeg() {

@@ -107,8 +107,8 @@
 }
 
 .previewOuter {
-  height: 200px;
-  background-color: #ccc;
+  height: 230px;
+  background-color: #000;
   margin-top: 5px;
   margin-bottom: 5px;
   position: relative;
@@ -129,6 +129,14 @@
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
+}
+
+.progress {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-end;
 }
 
 .programNames {

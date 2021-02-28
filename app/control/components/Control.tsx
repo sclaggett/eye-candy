@@ -25,6 +25,7 @@ type ControlState = {
   seed: number;
   log: string;
   running: boolean;
+  progress: number;
   imageUrl: string;
   imageTop: number;
   imageLeft: number;
@@ -69,6 +70,7 @@ export default class Control extends React.Component<
       seed: 108,
       log: '',
       running: false,
+      progress: 0,
       imageUrl: '',
       imageTop: 0,
       imageLeft: 0,
@@ -89,11 +91,13 @@ export default class Control extends React.Component<
     this.onLog = this.onLog.bind(this);
     this.onRunPreviewChannel = this.onRunPreviewChannel.bind(this);
     this.onPreviewInterval = this.onPreviewInterval.bind(this);
+    this.onRunProgress = this.onRunProgress.bind(this);
     this.onRunStopped = this.onRunStopped.bind(this);
 
     // Listen for IPC calls
     ipcRenderer.on('log', this.onLog);
     ipcRenderer.on('runPreviewChannel', this.onRunPreviewChannel);
+    ipcRenderer.on('runProgress', this.onRunProgress);
     ipcRenderer.on('runStopped', this.onRunStopped);
   }
 
@@ -279,9 +283,9 @@ export default class Control extends React.Component<
       }));
       return;
     }
-    let timeout = 10;
+    let timeout = 30;
     if (this.state.fps !== 0) {
-      timeout = 1000 / this.state.fps / 2;
+      timeout = 1000 / this.state.fps;
     }
     this.previewInterval = setInterval(this.onPreviewInterval, timeout);
   }
@@ -363,6 +367,20 @@ export default class Control extends React.Component<
         } as unknown) as ControlState);
       }
     );
+  }
+
+  /*
+   * The onRunProgress() function will be invoked by the main process at regular
+   * intervals to notify the control window as the run progresses.
+   */
+  onRunProgress(
+    _event: IpcRendererEvent,
+    frameNumber: number,
+    framesTotal: number
+  ) {
+    this.setState(({
+      progress: Math.round((frameNumber * 100) / framesTotal),
+    } as unknown) as ControlState);
   }
 
   /*
@@ -553,8 +571,16 @@ export default class Control extends React.Component<
                 <img
                   className={styles.previewImage}
                   src={this.state.imageUrl}
+                  style={this.state.running ? {} : { visibility: 'hidden' }}
                   alt=""
                 />
+              </div>
+              <div
+                className={styles.progress}
+                style={this.state.running ? {} : { visibility: 'hidden' }}
+              >
+                {this.state.progress}
+                &percnt;
               </div>
             </div>
           </div>
