@@ -18,14 +18,17 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: 14
+        working-directory: ./eye-candy
 
       - name: yarn install
         run: |
           yarn install --frozen-lockfile
+        working-directory: ./eye-candy
 
       - name: yarn electron-rebuild
         run: |
           yarn electron-rebuild
+        working-directory: ./eye-candy
 
       - name: yarn package
         env:
@@ -34,3 +37,4 @@ jobs:
           yarn package-ci
           yarn lint
           yarn tsc
+        working-directory: ./eye-candy

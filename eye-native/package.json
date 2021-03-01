@@ -1,0 +1,26 @@
+{
+  "name": "eye-native",
+  "version": "0.0.6",
+  "description": "",
+  "author": "",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sclaggett/eye-native.git"
+  },
+  "main": "index.js",
+  "gypfile": true,
+  "scripts": {
+    "build": "node-gyp build",
+    "rebuild": "node-gyp rebuild",
+    "clean": "node-gyp clean"
+  },
+  "devDependencies": {
+    "node-addon-api": "^1.3.0",
+    "node-gyp": "^7.1.2"
+  },
+  "dependencies": {
+    "bindings": "^1.5.0",
+    "node-addon-api": "^3.1.0"
+  }
+}
