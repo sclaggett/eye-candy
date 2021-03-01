@@ -18,14 +18,13 @@ public:
   bool isProcessRunning();
   void waitForExit();
 
-  void writeStdin(uint8_t* data, uint32_t length);
-  std::string readStdout();
-  std::string readStderr();
+  bool writeStdin(uint8_t* data, uint32_t length);
 
 private:
   bool startProcess();
   void terminateProcess();
   void cleanUpProcess();
+  std::vector<std::string> splitString(std::string str,std::string sep);
 
 public:
   uint32_t run();

@@ -51,7 +51,11 @@ uint32_t FrameThread::run()
 
     // Write the raw frame to the ffmpeg process
     uint32_t frameLength = frame.total() * frame.elemSize();
-    ffmpegProcess->writeStdin(frame.data, frameLength);
+    if (!ffmpegProcess->writeStdin(frame.data, frameLength))
+    {
+      printf("[FrameThread] ERROR: Failed to write to FFmpeg\n");
+      break;
+    }
 
     // Create the preview channel
     if (channelState == CHANNEL_CLOSED)
@@ -63,7 +67,7 @@ uint32_t FrameThread::run()
         if (!platform::createNamedPipeForWriting(previewChannelName, namedPipeId,
           opening))
         {
-          printf("[FrameThread] Failed to create named pipe\n");
+          printf("[FrameThread] ERROR: Failed to create named pipe\n");
           channelState = CHANNEL_ERROR;
           continue;
         }
@@ -80,13 +84,12 @@ uint32_t FrameThread::run()
       bool opened = false;
       if (!platform::openNamedPipeForWriting(namedPipeId, opened))
       {
-        printf("[FrameThread] Named pipe connetion failed\n");
+        printf("[FrameThread] ERROR: Named pipe connetion failed\n");
         channelState = CHANNEL_ERROR;
         continue;
       }
       if (opened)
       {
-        printf("## [FrameThread] Renderer process has connected\n");
         channelState = CHANNEL_OPEN;
       }
     }
@@ -98,7 +101,6 @@ uint32_t FrameThread::run()
       if (!writeAll(namedPipeId, (const uint8_t*)header.data(), header.size()) ||
         !writeAll(namedPipeId, (const uint8_t*)frame.data, frameLength))
       {
-        printf("[FrameThread] Failed to write frame to pipe\n");
         channelState = CHANNEL_ERROR;
         continue;
       }

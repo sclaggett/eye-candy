@@ -14,18 +14,18 @@ Thread::Thread(string name) :
 {
 }
 
-std::string Thread::spawn()
+bool Thread::spawn()
 {
   if (threadId != 0)
   {
-    return "An instance of the thread is already running";
+    return false;
   }
   if (!platform::spawnThread(runHelper, this, threadId))
   {
-    return "Failed to spawn thread";
+    return false;
   }
   threadRunning = true;
-  return "";
+  return true;
 }
 
 bool Thread::isRunning()
@@ -37,23 +37,23 @@ bool Thread::isRunning()
   return threadRunning;
 }
 
-std::string Thread::terminate()
+bool Thread::terminate()
 {
   if (threadId == 0)
   {
-    return "";
+    return true;
   }
   signalExit();
   if (waitForCompletion(100))
   {
-    return "";
+    return false;
   }
   if (!platform::terminateThread(threadId, 1))
   {
-    return "Unable to cancel thread";
+    return false;
   }
   threadRunning = false;
-  return "";
+  return true;
 }
 
 void Thread::signalExit()
