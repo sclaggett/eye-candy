@@ -10,7 +10,6 @@ const math = require("./math")
 const {DATADIR} = require('../vars.js')
 const R = require("ramda")
 
-
 // this object has all values usable in EPL
 // TODO: should this also be available for preRenderFuncWrapper?
 let EPL = Object.assign({log: console.log, JSON: JSON, DATADIR: DATADIR}, {R: R},
