@@ -27,8 +27,8 @@ uint32_t PipeReader::run()
     int32_t ret = platform::waitForData(file, 100);
     if (ret == -1)
     {
-      printf("ERROR: Failed to read from pipe\n");
-      return 0;
+      printf("[PipeReader] ERROR: Failed to wait for data\n");
+      break;
     }
     else if (ret == 0)
     {
@@ -39,11 +39,7 @@ uint32_t PipeReader::run()
     ret = platform::read(file, (uint8_t*)&(buffer[0]), 1023);
     if (ret == -1)
     {
-      printf("ERROR: Failed to read from pipe\n");
-      return 0;
-    }
-    else if (ret == 0)
-    {
+      printf("[PipeReader] ERROR: Failed to read from pipe\n");
       break;
     }
     else if (ret > 0)

@@ -14,13 +14,30 @@ PreviewThread::PreviewThread(string name, shared_ptr<Queue<cv::Mat*>> queue) :
 
 uint32_t PreviewThread::run()
 {
-  printf("## Starting preview thread\n");
-
-  // Open the named pipe for reading
+  // Open the named pipe for reading. It's not unusual for this process to start
+  // before the frame thread has created the named pipe so wait a few seconds.
   uint64_t namedPipeId = 0;
-  if (!platform::openNamedPipeForReading(channelName, namedPipeId))
+  uint32_t failCount = 0;
+  bool fileNotFound;
+  while ((namedPipeId == 0) && (failCount < 30))
   {
-    printf("[PreviewThread] Failed to open named pipe\n");
+    if (!platform::openNamedPipeForReading(channelName, namedPipeId, fileNotFound))
+    {
+      if (fileNotFound)
+      {
+        platform::sleep(100);
+        failCount += 1;
+      }
+      else
+      {
+        printf("[PreviewThread] ERROR: Failed to open named pipe (1)\n");
+        return 1;
+      }
+    }
+  }
+  if (namedPipeId == 0)
+  {
+    printf("[PreviewThread] ERROR: Failed to open named pipe (2)\n");
     return 1;
   }
 
@@ -33,12 +50,12 @@ uint32_t PreviewThread::run()
     // Read the frame header from the named pipe and extract the fields
     if (!readAll(namedPipeId, &(frameHeader[0]), FRAME_HEADER_SIZE))
     {
-      printf("[PreviewThread] Failed to read from named pipe\n");
+      printf("[PreviewThread] ERROR: Failed to read header from named pipe\n");
       return 1;
     }
     if (!frameheader::parse(frameHeader, number, width, height, length))
     {
-      printf("[PreviewThread] Failed to parse frame header\n");
+      printf("[PreviewThread] ERROR: Failed to parse frame header\n");
       return 1;
     }
 
@@ -54,7 +71,7 @@ uint32_t PreviewThread::run()
     }
     if (!readAll(namedPipeId, buffer, length))
     {
-      printf("[PreviewThread] Failed to read from named pipe\n");
+      printf("[PreviewThread] ERROR: Failed to read frame from named pipe\n");
       return 1;
     }
 
@@ -66,7 +83,6 @@ uint32_t PreviewThread::run()
   }
 
   platform::closeNamedPipeForReading(namedPipeId);
-  printf("## Stopping preview thread\n");
   return 0;
 }
 

@@ -9,9 +9,9 @@ public:
   Thread(std::string name);
   virtual ~Thread() {};
 
-  std::string spawn();
+  bool spawn();
   bool isRunning();
-  std::string terminate();
+  bool terminate();
 
 protected:
   void signalExit();

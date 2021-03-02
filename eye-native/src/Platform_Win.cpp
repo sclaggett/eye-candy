@@ -21,12 +21,12 @@ bool platform::spawnProcess(string executable, vector<string> arguments,
   HANDLE childStdoutRd = NULL, childStdoutWr = NULL;
   if (!CreatePipe(&childStdoutRd, &childStdoutWr, &saAttr, 0))
   {
-    printf("ERROR: Failed to create stdout pipes\n");
+    printf("[Platform_Win] ERROR: Failed to create stdout pipes\n");
     return false;
   }
   if (!SetHandleInformation(childStdoutRd, HANDLE_FLAG_INHERIT, 0))
   {
-    printf("ERROR: Failed to set stdout pipe flag\n");
+    printf("[Platform_Win] ERROR: Failed to set stdout pipe flag\n");
     return false;
   }
 
@@ -34,12 +34,12 @@ bool platform::spawnProcess(string executable, vector<string> arguments,
   HANDLE childStderrRd = NULL, childStderrWr = NULL;
   if (!CreatePipe(&childStderrRd, &childStderrWr, &saAttr, 0))
   {
-    printf("ERROR: Failed to create stderr pipes\n");
+    printf("[Platform_Win] ERROR: Failed to create stderr pipes\n");
     return false;
   }
   if (!SetHandleInformation(childStderrRd, HANDLE_FLAG_INHERIT, 0))
   {
-    printf("ERROR: Failed to set stderr pipe flag\n");
+    printf("[Platform_Win] ERROR: Failed to set stderr pipe flag\n");
     return false;
   }
   
@@ -47,12 +47,12 @@ bool platform::spawnProcess(string executable, vector<string> arguments,
   HANDLE childStdinRd = NULL, childStdinWr = NULL;
   if (!CreatePipe(&childStdinRd, &childStdinWr, &saAttr, 0))
   {
-    printf("ERROR: Failed to create stdin pipes\n");
+    printf("[Platform_Win] ERROR: Failed to create stdin pipes\n");
     return false;
   }
   if (!SetHandleInformation(childStdinWr, HANDLE_FLAG_INHERIT, 0))
   {
-    printf("ERROR: Failed to set stdin pipe flag\n");
+    printf("[Platform_Win] ERROR: Failed to set stdin pipe flag\n");
     return false;
   }
 
@@ -81,7 +81,7 @@ bool platform::spawnProcess(string executable, vector<string> arguments,
     &siStartInfo, &piProcInfo))
   {
     free(cmdLineStr);
-    printf("ERROR: Failed to create ffmpeg process\n");
+    printf("[Platform_Win] ERROR: Failed to create ffmpeg process\n");
     return false;
   }
   free(cmdLineStr);
@@ -106,7 +106,7 @@ bool platform::isProcessRunning(uint64_t pid)
   DWORD exitCode = 0;
   if (!GetExitCodeProcess((HANDLE)pid, &exitCode))
   {
-    printf("ERROR: Failed to check if child process is running\n");
+    printf("[Platform_Win] ERROR: Failed to check if child process is running\n");
     return false;
   }
   return (exitCode == STILL_ACTIVE);
@@ -136,7 +136,7 @@ bool platform::spawnThread(runFunction func, void* context, uint64_t& threadId)
   runContext->context = context;
   DWORD dwThreadId = 0;
   threadId = (uint64_t)CreateThread(NULL, 0, &runHelperWin, runContext, 0, &dwThreadId);
-  return (threadId == 0);
+  return (threadId != 0);
 }
 
 bool platform::terminateThread(uint64_t threadId, uint32_t exitCode)
@@ -165,6 +165,7 @@ bool platform::createNamedPipeForWriting(string channelName, uint64_t& pipeId,
     PIPE_TYPE_BYTE | PIPE_NOWAIT, 1, 0, 0, 0, NULL);
   if (pipe == INVALID_HANDLE_VALUE)
   {
+    printf("[Platform_Win] ERROR: Failed to create named pipe for writing\n");
     return false;
   }
   pipeId = (uint64_t)pipe;
@@ -184,13 +185,14 @@ bool platform::openNamedPipeForWriting(uint64_t pipeId, bool& opened)
     opened = true;
     return true;
   }
-  else if (err == ERROR_IO_PENDING)
+  else if (err == ERROR_PIPE_LISTENING)
   {
     opened = false;
     return true;
   }
   else
   {
+    printf("[Platform_Win] ERROR: Failed to open named pipe for writing\n");
     return false;
   }
 }
@@ -200,27 +202,43 @@ void platform::closeNamedPipeForWriting(string channelName, uint64_t pipeId)
   CloseHandle((HANDLE)pipeId);
 }
 
-bool platform::openNamedPipeForReading(string channelName, uint64_t& pipeId)
+bool platform::openNamedPipeForReading(string channelName, uint64_t& pipeId, bool& fileNotFound)
 {
-  return false;
+  // Open the named pipe for reading
+  HANDLE pipe = CreateFile(channelName.c_str(), GENERIC_READ,
+    FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
+    FILE_ATTRIBUTE_NORMAL, NULL);
+  if (pipe == INVALID_HANDLE_VALUE)
+  {
+    fileNotFound = (GetLastError() == ERROR_FILE_NOT_FOUND);
+    if (!fileNotFound)
+    {
+      printf("[Platform_Win] ERROR: Failed to open named pipe for reading\n");
+    }
+    return false;
+  }
+  pipeId = (uint64_t)pipe;
+
+  return true;
 }
 
 void platform::closeNamedPipeForReading(uint64_t pipeId)
 {
-  
+  CloseHandle((HANDLE)pipeId);
 }
 
 int32_t platform::waitForData(uint64_t file, uint32_t timeoutMs)
 {
-  // This is currently not implemented for Windows
+  // This isn't implemented on Windows because we let the read() function below block
   return (int32_t)file;
 }
 
 int32_t platform::read(uint64_t file, uint8_t* buffer, uint32_t maxLength)
 {
   DWORD dwRead = 0;
-  if (!ReadFile((HANDLE)file, buffer, 1023, &dwRead, NULL))
+  if (!ReadFile((HANDLE)file, buffer, maxLength, &dwRead, NULL))
   {
+    printf("[Platform_Win] ERROR: Failed to read from file or pipe\n");
     return -1;
   }
   return (int32_t)dwRead;
@@ -231,6 +249,7 @@ int32_t platform::write(uint64_t file, const uint8_t* buffer, uint32_t length)
   DWORD dwWritten = 0;
   if (!WriteFile((HANDLE)file, buffer, length, &dwWritten, NULL))
   {
+    printf("[Platform_Win] ERROR: Failed to write to file or pipe\n");
     return -1;
   }
   return dwWritten;

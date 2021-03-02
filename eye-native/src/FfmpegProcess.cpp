@@ -53,14 +53,17 @@ uint32_t FfmpegProcess::run()
 {
   if (!startProcess())
   {
-    return 0;
+    return 1;
   }
   stdoutReader = shared_ptr<PipeReader>(new PipeReader("ffmpeg_stdout",
     processStdout));
-  stdoutReader->spawn();
   stderrReader = shared_ptr<PipeReader>(new PipeReader("ffmpeg_stderr",
     processStderr));
-  stderrReader->spawn();
+  if (!stdoutReader->spawn() || !stderrReader->spawn())
+  {
+    printf("[FfmpegProcess] ERROR: Failed to spawn reader threads\n");
+    return 1;
+  }
   processMutex.lock();
   processStarted = true;
   processMutex.unlock();
@@ -70,7 +73,7 @@ uint32_t FfmpegProcess::run()
     if (!stdoutReader->isRunning() ||
       !stderrReader->isRunning())
     {
-      printf("ERROR: A process thread has exited unexpectedly\n");
+      printf("[FfmpegProcess] ERROR: A process thread has exited unexpectedly\n");
       break;
     }
     if (checkForExit())
@@ -79,14 +82,29 @@ uint32_t FfmpegProcess::run()
       break;
     }
     platform::sleep(10);
+    string data = stdoutReader->getData();
+    if (!data.empty())
+    {
+      vector<string> lines = splitString(data, "\n");
+      for (auto it = lines.begin(); it != lines.end(); ++it)
+      {
+        printf("[ffmpeg.stdout] %s\n", (*it).c_str());
+      }
+    }
+    data = stderrReader->getData();
+    if (!data.empty())
+    {
+      vector<string> lines = splitString(data, "\n");
+      for (auto it = lines.begin(); it != lines.end(); ++it)
+      {
+        printf("[ffmpeg.stderr] %s\n", (*it).c_str());
+      }
+    }
   }
-  stdoutReader->terminate();
-  stderrReader->terminate();
-
-  // TODO: Iteratively print the output in the loop above
-  printf("## Ffmpeg process has exited\n");
-  printf("## Stdout: %s\n", stdoutReader->getData().c_str());
-  printf("## Stderr: %s\n", stderrReader->getData().c_str());
+  if (!stdoutReader->terminate() || !stderrReader->terminate())
+  {
+    printf("[FfmpegProcess] WARN: Failed to terminate reader threads\n");
+  }
   cleanUpProcess();
   return 0;
 }
@@ -120,28 +138,14 @@ void FfmpegProcess::waitForExit()
   }
 }
 
-void FfmpegProcess::writeStdin(uint8_t* data, uint32_t length)
+bool FfmpegProcess::writeStdin(uint8_t* data, uint32_t length)
 {
   if (processStdin == 0)
   {
-    printf("ERROR: Stdin has been closed\n");
-    return;
+    return false;
   }
   int bytesWritten = platform::write(processStdin, data, length);
-  if ((bytesWritten < 0) || ((uint32_t)bytesWritten != length))
-  {
-    printf("ERROR: Failed to write to process stdin\n");
-  }
-}
-
-string FfmpegProcess::readStdout()
-{
-  return stdoutReader->getData();
-}
-
-string FfmpegProcess::readStderr()
-{
-  return stderrReader->getData();
+  return ((bytesWritten >= 0) || ((uint32_t)bytesWritten == length));
 }
 
 void FfmpegProcess::terminateProcess()
@@ -166,4 +170,17 @@ void FfmpegProcess::cleanUpProcess()
     platform::close(processStderr);
     processStderr = 0;
   }
+}
+
+vector<string> FfmpegProcess::splitString(string str, string sep)
+{
+  vector<string> arr;
+  char* cstr = const_cast<char*>(str.c_str());
+  char* current = strtok(cstr, sep.c_str());
+  while (current != NULL)
+  {
+    arr.push_back(current);
+    current = strtok(NULL, sep.c_str());
+  }
+  return arr;
 }

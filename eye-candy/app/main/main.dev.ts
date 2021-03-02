@@ -143,6 +143,7 @@ function startFrameCleanTimer() {
     return;
   }
   frameCleanTimer = setInterval(function () {
+    // Get an array of completed frames and delete them from our cache
     const completed: string[] = eyeNative.checkCompletedFrames();
     for (let i = 0; i < completed.length; i += 1) {
       const id: string = completed[i];
@@ -150,9 +151,23 @@ function startFrameCleanTimer() {
         delete pendingFrames[id];
       }
     }
+
+    // Notify the control window of our progress
+    if (!videoInfo) {
+      return;
+    }
+    const framesProcessing = Object.keys(pendingFrames).length;
+    if (controlWindow && controlWindow.webContents) {
+      controlWindow.webContents.send(
+        'runProgress',
+        videoInfo.frameNumber - PRE_FRAME_COUNT - framesProcessing,
+        videoInfo.frameCount - PRE_FRAME_COUNT
+      );
+    }
+
+    // Detect when recording is complete and stop the run
     if (
-      Object.keys(pendingFrames).length === 0 &&
-      videoInfo !== null &&
+      framesProcessing === 0 &&
       videoInfo.frameNumber >= videoInfo.frameCount
     ) {
       clearInterval(frameCleanTimer);
@@ -182,18 +197,10 @@ function frameCaptured(image: nativeImage) {
   );
   pendingFrames[id] = image;
 
-  // Start the frame cleanup timer if this is the first frame
+  // Start the frame cleanup timer if this is the first frame and increment the
+  // frame number
   if (videoInfo.frameNumber === PRE_FRAME_COUNT) {
     startFrameCleanTimer();
-  }
-
-  // Notify the control window of our progress and increment the frame number
-  if (controlWindow && controlWindow.webContents) {
-    controlWindow.webContents.send(
-      'runProgress',
-      videoInfo.frameNumber - PRE_FRAME_COUNT,
-      videoInfo.frameCount - PRE_FRAME_COUNT
-    );
   }
   videoInfo.frameNumber += 1;
 }
