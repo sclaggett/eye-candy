@@ -18,10 +18,12 @@ namespace platform
   bool terminateThread(uint64_t threadId, uint32_t exitCode);
 
   bool generateUniquePipeName(std::string& channelName);
-  bool createNamedPipeForWriting(std::string channelName, uint64_t& pipeId, bool& opening);
+  bool createNamedPipeForWriting(std::string channelName, uint64_t& pipeId,
+    bool& opening);
   bool openNamedPipeForWriting(uint64_t pipeId, bool& opened);
   void closeNamedPipeForWriting(std::string channelName, uint64_t pipeId);
-  bool openNamedPipeForReading(std::string channelName, uint64_t& pipeId, bool& fileNotFound);
+  bool openNamedPipeForReading(std::string channelName, uint64_t& pipeId,
+    bool& fileNotFound);
   void closeNamedPipeForReading(uint64_t pipeId);
 
   int32_t waitForData(uint64_t file, uint32_t timeoutMs);

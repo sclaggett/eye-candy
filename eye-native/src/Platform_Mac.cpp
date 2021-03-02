@@ -214,11 +214,13 @@ void platform::closeNamedPipeForWriting(string channelName, uint64_t pipeId)
   unlink(channelName.c_str());
 }
 
-bool platform::openNamedPipeForReading(string channelName, uint64_t& pipeId)
+bool platform::openNamedPipeForReading(string channelName, uint64_t& pipeId,
+  bool& fileNotFound)
 {
   int ret = open(channelName.c_str(), O_RDONLY);
   if (ret == -1)
   {
+    fileNotFound = false;
     return false;
   }
   pipeId = (uint64_t)ret;

@@ -42,11 +42,10 @@
         },
         "link_settings": {
           "libraries": [
-            "-Wl,-rpath,/Users/shane/Desktop/eye-candy/app/node_modules/eye-native/build/Release/"
+            "-Wl,-rpath,@loader_path/../../../eye-native/build/Release/",
           ],
         },
         'libraries': [
-          "-Wl,-rpath,./build/Release/",
           "-lopencv_core",
           "-lopencv_features2d",
           "-lopencv_highgui",
