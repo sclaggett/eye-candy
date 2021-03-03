@@ -11,10 +11,6 @@ FfmpegProcess::FfmpegProcess(string exec, uint32_t width, uint32_t height, uint3
 {
   // Check options using:
   //   ffmpeg -h encoder=h264_videotoolbox
-  // Profile and level are both interesting. Experiment with "-b:v 2000k"
-
-  // ffmpeg -f rawvideo -pix_fmt rgb24 -vf scale=960x720 1920x1080 -framerate 30 -i pipe:0
-  // -c:v h264_videotoolbox -profile:v high -pix_fmt yuv420p -y output.mp4
 
   // Input options
   arguments.push_back("-f");
@@ -33,9 +29,6 @@ FfmpegProcess::FfmpegProcess(string exec, uint32_t width, uint32_t height, uint3
   arguments.push_back("pipe:0");
 
   // Output options
-  //arguments.push_back("-vf");
-  //arguments.push_back("scale=" + to_string(width) + "x" + to_string(height));
-
   arguments.push_back("-c:v");
   arguments.push_back(encoder);
 
@@ -44,6 +37,9 @@ FfmpegProcess::FfmpegProcess(string exec, uint32_t width, uint32_t height, uint3
 
   arguments.push_back("-pix_fmt");
   arguments.push_back("yuv420p");
+
+  arguments.push_back("-realtime");
+  arguments.push_back("true");
 
   arguments.push_back("-y");
   arguments.push_back(outputPath);

@@ -1,6 +1,6 @@
-import Stimulus from '../../common/stimuli/Stimulus';
+import Stimulus from '../../shared/Stimulus';
 import StimulusBase from './StimulusBase';
-import VideoInfo from '../../common/VideoInfo';
+import VideoInfo from '../../shared/VideoInfo';
 
 export default class Wait extends StimulusBase {
   constructor(stimulus: Stimulus, videoInfo: VideoInfo) {

@@ -2,7 +2,7 @@ import React from 'react';
 import { IpcRendererEvent } from 'electron';
 import path from 'path';
 import * as styles from './Control.css';
-import StartProgram from '../../common/StartProgram';
+import StartProgram from '../../shared/StartProgram';
 
 const { ipcRenderer, nativeImage } = require('electron');
 const fs = require('fs');

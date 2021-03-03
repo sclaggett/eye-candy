@@ -19,18 +19,9 @@ const Random = require('./random');
 const Misc = require('./misc');
 const math = require('./math');
 
-// The lint syntax checker really doesn't like console.log statements anywhere in
-// production code which I sympathize with. However, it's nice to allow our EPL
-// programs to write log statements. Define a global logging function here for use
-// by all EPL programs that won't offend lint.
-function eplLog(message) {
-  // console.log(message);
-}
-
 // this object has all values usable in EPL
 // TODO: should this also be available for preRenderFuncWrapper?
 const EPL = {
-  log: eplLog,
   JSON,
   R,
   ...Types,
@@ -40,16 +31,24 @@ const EPL = {
   ...Misc,
 };
 
-function compile(programJS, seed, windowHeight, windowWidth, dataDir) {
+function compile(
+  programJS,
+  seed,
+  windowWidth,
+  windowHeight,
+  dataDir,
+  logCallback
+) {
   // console.log('compiling EPL.');
   // FOR VM2 (production)
   // note: if changing this, also must change preRenderFuncWrapper
   const vm = new VM({
     sandbox: {
-      windowHeight,
       windowWidth,
+      windowHeight,
       seed,
       dataDir,
+      log: logCallback,
       ...EPL,
     },
     console: 'inherit',

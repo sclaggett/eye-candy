@@ -2,11 +2,25 @@ import Stimulus from '../../shared/Stimulus';
 import StimulusBase from './StimulusBase';
 import VideoInfo from '../../shared/VideoInfo';
 
-export default class Solid extends StimulusBase {
+export default class Grating extends StimulusBase {
+  speed: number;
+
+  width: number;
+
+  angle: number;
+
+  barColor: string;
+
   constructor(stimulus: Stimulus, videoInfo: VideoInfo) {
     super(stimulus, videoInfo);
+
+    this.speed = stimulus.speed;
+    this.width = stimulus.width;
+    this.angle = stimulus.angle;
+    this.barColor = stimulus.barColor;
+
     console.log(
-      `Created Solid stimulus which will run for ${stimulus.lifespan} seconds at ${videoInfo.fps} fps for a total of ${this.frameCount} frames`
+      `Created Grating stimulus which will run for ${stimulus.lifespan} seconds at ${videoInfo.fps} fps for a total of ${this.frameCount} frames`
     );
   }
 
@@ -17,7 +31,7 @@ export default class Solid extends StimulusBase {
     context.restore();
     context.fillStyle = 'red';
     context.font = '16px Arial';
-    context.fillText(`Solid ${this.frameNumber}`, 50, 50);
+    context.fillText(`Grating ${this.frameNumber}`, 50, 50);
     this.frameNumber += 1;
   }
 }

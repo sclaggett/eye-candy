@@ -1,5 +1,5 @@
-import Stimulus from '../../common/stimuli/Stimulus';
-import VideoInfo from '../../common/VideoInfo';
+import Stimulus from '../../shared/Stimulus';
+import VideoInfo from '../../shared/VideoInfo';
 
 export default class StimulusBase {
   stimulus: Stimulus;

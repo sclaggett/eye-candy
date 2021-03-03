@@ -16,10 +16,10 @@ import path from 'path';
 import { app, BrowserWindow, dialog, nativeImage, Rectangle } from 'electron';
 import url from 'url';
 import MenuBuilder from './menu';
-import ProgramNext from '../common/ProgramNext';
-import StartProgram from '../common/StartProgram';
-import Stimulus from '../common/stimuli/Stimulus';
-import VideoInfo from '../common/VideoInfo';
+import ProgramNext from '../shared/ProgramNext';
+import StartProgram from '../shared/StartProgram';
+import Stimulus from '../shared/Stimulus';
+import VideoInfo from '../shared/VideoInfo';
 
 const { execFileSync } = require('child_process');
 const fs = require('fs');
@@ -80,19 +80,19 @@ const installExtensions = async () => {
  */
 
 function onFileNew() {
-  console.log('## File new');
+  console.log('## File new\n');
 }
 
 function onFileOpen() {
-  console.log('## File open');
+  console.log('## File open\n');
 }
 
 function onFileSave() {
-  console.log('## File save');
+  console.log('## File save\n');
 }
 
 function onFileSaveAs() {
-  console.log('## File save as');
+  console.log('## File save as\n');
 }
 
 /**
@@ -435,14 +435,17 @@ function compileProgram() {
   if (!videoInfo) {
     throw new Error('Video info not defined');
   }
-  log(`Compiling ${videoInfo.programName}... `);
+  log(`Compiling ${videoInfo.programName}...\n`);
   try {
     program = compileEPL.compile(
       videoInfo.programText,
       videoInfo.seed,
       videoInfo.width,
       videoInfo.height,
-      '/data/'
+      '/data/',
+      (message) => {
+        log(`[epl] ${message}\n`);
+      }
     );
     if (program === null) {
       throw new Error('Failed to compile program');
@@ -461,8 +464,7 @@ function compileProgram() {
     return false;
   }
   program.initialize();
-  log('success\n');
-  log('Generating stimuli... ');
+  log('Generating stimuli...\n');
   return true;
 }
 function generateStimuli() {
@@ -511,17 +513,16 @@ function checkFFmpeg() {
   if (!videoInfo) {
     throw new Error('Video info not defined');
   }
-  log('Checking FFmpeg executable... ');
+  log('Checking FFmpeg executable...\n');
   try {
     fs.accessSync(videoInfo.ffmpegPath, fs.constants.X_OK);
   } catch (err) {
-    log(`failed to find executable at ${videoInfo.ffmpegPath}\n`);
+    log(`Error: Failed to find executable at ${videoInfo.ffmpegPath}\n`);
     return false;
   }
-  log(`found\n`);
 
   // Check the FFmpeg version
-  log('Detecting FFmpeg version... ');
+  log('Detecting FFmpeg version...\n');
   let result: string = execFileSync(videoInfo.ffmpegPath, [
     '-hide_banner',
     '-version',
@@ -536,10 +537,10 @@ function checkFFmpeg() {
     }
   }
   if (version === '') {
-    log('failed to detect version\n');
+    log('Error: Failed to detect version\n');
     return false;
   }
-  log(`${version}\n`);
+  log(`Detected version ${version}\n`);
 
   // We prefer to use a specialized hardware chip to encode H.264 video if one is
   // available. Determine the name of the hardware encoder by checking the platform
@@ -550,7 +551,7 @@ function checkFFmpeg() {
   const swEncoder = 'libx264';
 
   // Check if ffmpeg supports the hardware and software encoders
-  log('Detecting H.264 encoders... ');
+  log('Detecting H.264 encoders...\n');
   result = execFileSync(videoInfo.ffmpegPath, ['-hide_banner', '-encoders']);
   lines = result.toString().split(/\r?\n/);
   let hwEncoderFound = false;
@@ -564,18 +565,18 @@ function checkFFmpeg() {
     }
   }
   if (hwEncoderFound) {
-    log('hardware encoder found\n');
+    log('Hardware encoder found\n');
     videoInfo.encoder = hwEncoder;
   } else if (swEncoderFound) {
-    log('hardware encoder not found, falling back to software encoding\n');
+    log('Hardware encoder not found, falling back to software encoding\n');
     videoInfo.encoder = swEncoder;
   } else {
-    log('failed\n');
+    log('Error: Failed to detect a suitable H.264 encoder\n');
     return false;
   }
 
   // Make sure ffmpeg supports the mp4 file format
-  log('Checking output format... ');
+  log('Checking output format...\n');
   result = execFileSync(videoInfo.ffmpegPath, ['-hide_banner', '-muxers']);
   lines = result.toString().split(/\r?\n/);
   let mp4FormatFound = false;
@@ -585,10 +586,8 @@ function checkFFmpeg() {
       break;
     }
   }
-  if (mp4FormatFound) {
-    log('success\n');
-  } else {
-    log('failed\n');
+  if (!mp4FormatFound) {
+    log('Error: Failed to find support for MP4 format\n');
     return false;
   }
 
@@ -609,7 +608,7 @@ function spawnFFmpeg() {
     videoInfo.outputPath
   );
   if (result !== '') {
-    log(`${result}\n`);
+    log(`Error: ${result}\n`);
     return false;
   }
 
@@ -652,10 +651,9 @@ ipcMain.on('startProgram', (_event, stringArg: string) => {
     }
 
     // Wait 200 ms and create the stimulus window
-    log('Creating stimulus window... ');
+    log('Creating stimulus window...\n');
     setTimeout(function () {
       createStimulusWindow();
-      log('done\n');
     }, 200);
   }, 200);
 });

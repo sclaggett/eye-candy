@@ -1,9 +1,9 @@
 import React from 'react';
 import * as styles from './StimulusRenderer.css';
-import Stimulus from '../../common/stimuli/Stimulus';
+import Stimulus from '../../shared/Stimulus';
 import StimulusBase from '../stimuli/StimulusBase';
 import StimulusFactory from '../stimuli/StimulusFactory';
-import VideoInfo from '../../common/VideoInfo';
+import VideoInfo from '../../shared/VideoInfo';
 
 const ipc = require('electron').ipcRenderer;
 

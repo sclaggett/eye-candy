@@ -1,14 +1,23 @@
-import CheckerboardStimulus from '../../common/stimuli/CheckerboardStimulus';
-import Stimulus from '../../common/stimuli/Stimulus';
+import Stimulus from '../../shared/Stimulus';
 import StimulusBase from './StimulusBase';
-import VideoInfo from '../../common/VideoInfo';
+import VideoInfo from '../../shared/VideoInfo';
 
 export default class Checkerboard extends StimulusBase {
-  checkerboardStimulus: CheckerboardStimulus;
+  color: string;
+
+  alternateColor: string;
+
+  size: number;
+
+  angle: number;
 
   constructor(stimulus: Stimulus, videoInfo: VideoInfo) {
     super(stimulus, videoInfo);
-    this.checkerboardStimulus = stimulus as CheckerboardStimulus;
+
+    this.color = stimulus.color;
+    this.alternateColor = stimulus.alternateColor;
+    this.size = stimulus.size;
+    this.angle = stimulus.angle;
 
     console.log(
       `Created Checkerboard stimulus which will run for ${stimulus.lifespan} seconds at ${videoInfo.fps} fps for a total of ${this.frameCount} frames`
@@ -20,8 +29,8 @@ export default class Checkerboard extends StimulusBase {
     this.renderBackground(context);
 
     const canvasPattern: HTMLCanvasElement = document.createElement('canvas');
-    canvasPattern.width = this.checkerboardStimulus.size * 2;
-    canvasPattern.height = this.checkerboardStimulus.size * 2;
+    canvasPattern.width = this.size * 2;
+    canvasPattern.height = this.size * 2;
     const contextPattern: CanvasRenderingContext2D | null = canvasPattern.getContext(
       '2d'
     );
@@ -29,22 +38,12 @@ export default class Checkerboard extends StimulusBase {
       throw new Error('Failed to get context');
     }
 
-    contextPattern.fillStyle = this.checkerboardStimulus.alternateColor;
+    contextPattern.fillStyle = this.alternateColor;
     contextPattern.fillRect(0, 0, canvasPattern.width, canvasPattern.height);
 
-    contextPattern.fillStyle = this.checkerboardStimulus.color;
-    contextPattern.fillRect(
-      0,
-      0,
-      this.checkerboardStimulus.size,
-      this.checkerboardStimulus.size
-    );
-    contextPattern.fillRect(
-      this.checkerboardStimulus.size,
-      this.checkerboardStimulus.size,
-      this.checkerboardStimulus.size,
-      this.checkerboardStimulus.size
-    );
+    contextPattern.fillStyle = this.color;
+    contextPattern.fillRect(0, 0, this.size, this.size);
+    contextPattern.fillRect(this.size, this.size, this.size, this.size);
 
     const pattern: CanvasPattern | null = context.createPattern(
       canvasPattern,
@@ -60,11 +59,11 @@ export default class Checkerboard extends StimulusBase {
       context.canvas.width ** 2 + context.canvas.height ** 2
     );
 
-    if (this.checkerboardStimulus.angle === 0) {
+    if (this.angle === 0) {
       context.fillRect(0, 0, diag, diag);
     } else {
       context.translate(context.canvas.width / 2, context.canvas.height / 2);
-      context.rotate(-this.checkerboardStimulus.angle);
+      context.rotate(-this.angle);
       context.translate(-diag / 2, -diag / 2);
       context.fillRect(0, 0, diag, diag);
     }
