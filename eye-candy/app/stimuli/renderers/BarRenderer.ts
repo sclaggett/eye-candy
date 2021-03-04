@@ -1,23 +1,15 @@
-import Stimulus from '../../shared/stimuli/Stimulus';
-import StimulusBase from './StimulusBase';
+import Bar from '../types/Bar';
+import Stimulus from '../types/Stimulus';
+import StimulusRenderer from './StimulusRenderer';
 import VideoInfo from '../../shared/VideoInfo';
 
-export default class Bar extends StimulusBase {
-  speed: number;
-
-  width: number;
-
-  angle: number;
-
-  barColor: string;
+export default class BarRenderer extends StimulusRenderer {
+  bar: Bar;
 
   constructor(stimulus: Stimulus, videoInfo: VideoInfo) {
     super(stimulus, videoInfo);
 
-    this.speed = stimulus.speed;
-    this.width = stimulus.width;
-    this.angle = stimulus.angle;
-    this.barColor = stimulus.barColor;
+    this.bar = stimulus as Bar;
 
     console.log(
       `Created Bar stimulus which will run for ${stimulus.lifespan} seconds at ${videoInfo.fps} fps for a total of ${this.frameCount} frames`
@@ -30,26 +22,26 @@ export default class Bar extends StimulusBase {
 
     const timeDelta = this.frameNumber * (1 / this.videoInfo.fps);
     const diagonalLength = this.getDiagonalLength(context);
-    const r = diagonalLength / 2 - this.speed * timeDelta;
+    const r = diagonalLength / 2 - this.bar.speed * timeDelta;
     const x =
-      (this.width / 2) * Math.cos(-this.angle) +
-      r * Math.cos(-this.angle) +
+      (this.bar.width / 2) * Math.cos(-this.bar.angle) +
+      r * Math.cos(-this.bar.angle) +
       context.canvas.clientWidth / 2;
     const y =
-      (this.width / 2) * Math.sin(-this.angle) +
-      r * Math.sin(-this.angle) +
+      (this.bar.width / 2) * Math.sin(-this.bar.angle) +
+      r * Math.sin(-this.bar.angle) +
       context.canvas.clientHeight / 2;
 
     // might need to translate first if rotation
     context.translate(x, y);
-    context.fillStyle = this.barColor;
+    context.fillStyle = this.bar.barColor;
     // Rotate rectangle to be perpendicular with Center of Canvas
-    context.rotate(-this.angle);
+    context.rotate(-this.bar.angle);
     // Draw a rectangle, adjusting for Bar width
     context.fillRect(
-      Math.round(-this.width / 2),
+      Math.round(-this.bar.width / 2),
       Math.round(-diagonalLength / 2),
-      this.width,
+      this.bar.width,
       diagonalLength
     );
 

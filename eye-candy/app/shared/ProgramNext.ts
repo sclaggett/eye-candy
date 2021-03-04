@@ -1,6 +1,6 @@
 /* eslint @typescript-eslint/no-explicit-any: 0 */
 
-import Stimulus from './stimuli/Stimulus';
+import Stimulus from '../stimuli/types/Stimulus';
 
 export default class ProgramNext {
   done: boolean;

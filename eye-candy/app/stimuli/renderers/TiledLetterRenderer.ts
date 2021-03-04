@@ -1,29 +1,15 @@
-import Stimulus from '../../shared/stimuli/Stimulus';
-import StimulusBase from './StimulusBase';
+import Stimulus from '../types/Stimulus';
+import StimulusRenderer from './StimulusRenderer';
+import TiledLetter from '../types/TiledLetter';
 import VideoInfo from '../../shared/VideoInfo';
 
-export default class TiledLetter extends StimulusBase {
-  backgroundColor: string;
-
-  letter: string;
-
-  size: number;
-
-  padding: number;
-
-  color: string;
-
-  angle: number;
+export default class TiledLetterRenderer extends StimulusRenderer {
+  tiledLetter: TiledLetter;
 
   constructor(stimulus: Stimulus, videoInfo: VideoInfo) {
     super(stimulus, videoInfo);
 
-    this.backgroundColor = stimulus.backgroundColor;
-    this.letter = stimulus.letter;
-    this.size = stimulus.size;
-    this.padding = stimulus.padding;
-    this.color = stimulus.color;
-    this.angle = stimulus.angle;
+    this.tiledLetter = stimulus as TiledLetter;
 
     console.log(
       `Created TiledLetter stimulus which will run for ${stimulus.lifespan} seconds at ${videoInfo.fps} fps for a total of ${this.frameCount} frames`
@@ -35,8 +21,8 @@ export default class TiledLetter extends StimulusBase {
     this.renderBackground(context);
 
     const canvasPattern: HTMLCanvasElement = document.createElement('canvas');
-    canvasPattern.width = this.size + this.padding;
-    canvasPattern.height = this.size + this.padding;
+    canvasPattern.width = this.tiledLetter.size + this.tiledLetter.padding;
+    canvasPattern.height = this.tiledLetter.size + this.tiledLetter.padding;
     const contextPattern: CanvasRenderingContext2D | null = canvasPattern.getContext(
       '2d'
     );
@@ -44,15 +30,15 @@ export default class TiledLetter extends StimulusBase {
       throw new Error('Failed to get context');
     }
 
-    contextPattern.fillStyle = this.backgroundColor;
+    contextPattern.fillStyle = this.tiledLetter.backgroundColor;
     contextPattern.fillRect(0, 0, canvasPattern.width, canvasPattern.height);
 
-    contextPattern.fillStyle = this.color;
-    contextPattern.font = `${this.size}px Sloan`;
+    contextPattern.fillStyle = this.tiledLetter.color;
+    contextPattern.font = `${this.tiledLetter.size}px Sloan`;
     contextPattern.fillText(
-      this.letter,
-      this.padding / 2,
-      this.padding / 2 + this.size
+      this.tiledLetter.letter,
+      this.tiledLetter.padding / 2,
+      this.tiledLetter.padding / 2 + this.tiledLetter.size
     );
 
     const pattern: CanvasPattern | null = context.createPattern(
@@ -69,11 +55,11 @@ export default class TiledLetter extends StimulusBase {
       context.canvas.width ** 2 + context.canvas.height ** 2
     );
 
-    if (this.angle === 0) {
+    if (this.tiledLetter.angle === 0) {
       context.fillRect(0, 0, diag, diag);
     } else {
       context.translate(context.canvas.width / 2, context.canvas.height / 2);
-      context.rotate(-this.angle);
+      context.rotate(-this.tiledLetter.angle);
       context.translate(-diag / 2, -diag / 2);
       context.fillRect(0, 0, diag, diag);
     }

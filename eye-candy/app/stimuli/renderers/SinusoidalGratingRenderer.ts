@@ -1,24 +1,15 @@
-import Stimulus from '../../shared/stimuli/Stimulus';
-import StimulusBase from './StimulusBase';
+import SinusoidalGrating from '../types/SinusoidalGrating';
+import Stimulus from '../types/Stimulus';
+import StimulusRenderer from './StimulusRenderer';
 import VideoInfo from '../../shared/VideoInfo';
 
-export default class SinusoidalGrating extends StimulusBase {
-  speed: number;
-
-  width: number;
-
-  angle: number;
-
-  barColor: string;
+export default class SinusoidalGratingRenderer extends StimulusRenderer {
+  sinusoidalGrating: SinusoidalGrating;
 
   constructor(stimulus: Stimulus, videoInfo: VideoInfo) {
     super(stimulus, videoInfo);
 
-    this.speed = stimulus.speed;
-    this.width = stimulus.width;
-    this.angle = stimulus.angle;
-    this.backgroundColor = stimulus.backgroundColor;
-    this.barColor = stimulus.barColor;
+    this.sinusoidalGrating = stimulus as SinusoidalGrating;
 
     console.log(
       `Created SinusoidalGrating stimulus which will run for ${stimulus.lifespan} seconds at ${videoInfo.fps} fps for a total of ${this.frameCount} frames`
@@ -30,8 +21,8 @@ export default class SinusoidalGrating extends StimulusBase {
     this.renderBackground(context);
 
     const canvasPattern: HTMLCanvasElement = document.createElement('canvas');
-    canvasPattern.width = this.width * 2;
-    canvasPattern.height = this.width;
+    canvasPattern.width = this.sinusoidalGrating.width * 2;
+    canvasPattern.height = this.sinusoidalGrating.width;
     const contextPattern: CanvasRenderingContext2D | null = canvasPattern.getContext(
       '2d'
     );
@@ -39,17 +30,17 @@ export default class SinusoidalGrating extends StimulusBase {
       throw new Error('Failed to get context');
     }
 
-    const maxColor = this.colorToRGB(this.barColor);
-    const minColor = this.colorToRGB(this.backgroundColor);
+    const maxColor = this.colorToRGB(this.sinusoidalGrating.barColor);
+    const minColor = this.colorToRGB(this.sinusoidalGrating.backgroundColor);
     const colorScale = {
       r: (maxColor.r - minColor.r) / 2,
       g: (maxColor.g - minColor.g) / 2,
       b: (maxColor.b - minColor.b) / 2,
     };
 
-    console.log(`## Width '${this.width}'`);
-    for (let x = 0; x < this.width * 2; x += 1) {
-      const scale = Math.sin((x / this.width) * Math.PI);
+    console.log(`## Width '${this.sinusoidalGrating.width}'`);
+    for (let x = 0; x < this.sinusoidalGrating.width * 2; x += 1) {
+      const scale = Math.sin((x / this.sinusoidalGrating.width) * Math.PI);
       // (b-a)/2 * sin(x) + a + (b-a)/2
       const r = Math.round(colorScale.r * scale + minColor.r + colorScale.r);
       const g = Math.round(colorScale.g * scale + minColor.g + colorScale.g);
@@ -69,17 +60,24 @@ export default class SinusoidalGrating extends StimulusBase {
     context.fillStyle = pattern;
 
     const timeDelta = this.frameNumber * (1 / this.videoInfo.fps);
-    const position = (this.speed * timeDelta) % (2 * this.width);
+    const position =
+      (this.sinusoidalGrating.speed * timeDelta) %
+      (2 * this.sinusoidalGrating.width);
     const diag = Math.sqrt(
       context.canvas.width ** 2 + context.canvas.height ** 2
     );
 
     // move to the center of the canvas
     context.translate(context.canvas.width / 2, context.canvas.height / 2);
-    context.rotate(-this.angle);
+    context.rotate(-this.sinusoidalGrating.angle);
     context.translate(-diag / 2, -diag / 2);
-    context.translate(this.width * 2 - position, 0);
-    context.fillRect(-this.width * 2, 0, diag + this.width * 2, diag);
+    context.translate(this.sinusoidalGrating.width * 2 - position, 0);
+    context.fillRect(
+      -this.sinusoidalGrating.width * 2,
+      0,
+      diag + this.sinusoidalGrating.width * 2,
+      diag
+    );
 
     context.restore();
     context.fillStyle = 'red';

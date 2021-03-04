@@ -1,8 +1,9 @@
 import React from 'react';
-import Stimulus from '../../shared/stimuli/Stimulus';
-import StimulusBase from '../stimuli/StimulusBase';
-import StimulusFactory from '../stimuli/StimulusFactory';
+import Stimulus from '../../stimuli/types/Stimulus';
+import StimulusBaseRenderer from '../../stimuli/renderers/StimulusRenderer';
+import RendererFactory from '../../stimuli/renderers/RendererFactory';
 import VideoInfo from '../../shared/VideoInfo';
+import * as styles from './StimulusRenderer.css';
 
 const ipc = require('electron').ipcRenderer;
 
@@ -12,9 +13,9 @@ type StimulusRendererProps = {
 
 /*
  * This component's lifecycle consists of three stages:
- *  1. Starting: The state where we're initializing the stimulus list and preloading images.
- *     This also covers the frame or two it takes for the component to get a reference to the
- *     canvas element. These frames need to be discarded by the encoder.
+ *  1. Starting: The state where we're initializing the stimulus list and preloading
+ *     images. This also covers the frame or two it takes for the component to get a
+ *     reference to the canvas element. These frames need to be discarded by the encoder.
  *  2. Running: Stimuli are being rendered to the browser window at exactly one stimulus
  *     tick per frame.
  *  3. Complete: The program is complete and no more stimuli exist to be rendered.
@@ -25,24 +26,28 @@ enum LifecycleStage {
   COMPLETE,
 }
 
+// Experimentation has shown that we need to discard two additional frames beyond
+// the first frame number that we measure. It's not clear why this is--perhaps a
+// result of how the React framework boots, or maybe the result of off-by-one errors
+// in our counting logic.
+const PRE_FRAME_COUNT = 2;
+
 type StimulusRendererState = {
+  frameCount: number;
   lifecycleStage: LifecycleStage;
   videoInfo: VideoInfo | null;
-  stimulus: StimulusBase | null;
+  stimulus: StimulusBaseRenderer | null;
   stimulusQueue: Stimulus[];
 };
 
-// The next batch of stimuli will be retrieved from the main process when our queue reaches
-// this level.
+// The next batch of stimuli will be retrieved from the main process when our
+// queue reaches this level.
 const STIMULUS_RELOAD_THRESHOLD = 25;
 
 export default class StimulusRenderer extends React.Component<
   StimulusRendererProps,
   StimulusRendererState
 > {
-  // Number of times the render() function has been called
-  renderCount: number;
-
   // Set of image paths from the main process that need to be preloaded before the run
   // can start
   preloadImageSet: Set<string>;
@@ -65,13 +70,13 @@ export default class StimulusRenderer extends React.Component<
     super(props);
 
     this.state = {
+      frameCount: 0,
       lifecycleStage: LifecycleStage.STARTING,
       videoInfo: null,
       stimulus: null,
       stimulusQueue: [],
     };
 
-    this.renderCount = 0;
     this.preloadImageSet = new Set();
     this.imagesPreloading = 0;
     this.imagesPreloaded = 0;
@@ -105,11 +110,17 @@ export default class StimulusRenderer extends React.Component<
    * call to render().
    */
   onAnimationFrame(_timestamp: number) {
-    console.log('## Animation frame');
+    // Start by incrementing the frame count to make sure the render() function will be
+    // called even if no stimuli are available. Also queue a request for this function
+    // to be called again on the next frame.
+    this.setState((prevState) => ({
+      frameCount: prevState.frameCount + 1,
+    }));
+    requestAnimationFrame(this.onAnimationFrame);
 
-    // Detect the lifecycle change from starting to running based on whether all images have
-    // been preloaded and we have a canvas reference or not. The lifecycle stage in turn
-    // influences whether the render() function will show the canvas or not.
+    // Detect the lifecycle change from starting to running based on whether all images
+    // have been preloaded and we have a canvas reference or not. The lifecycle stage in
+    // turn influences whether the render() function will show the canvas or not.
     if (
       this.preloadComplete &&
       this.canvasRef.current !== null &&
@@ -118,12 +129,11 @@ export default class StimulusRenderer extends React.Component<
       this.setState({
         lifecycleStage: LifecycleStage.RUNNING,
       });
+      ipc.send('startStimuli', this.state.frameCount + PRE_FRAME_COUNT);
     }
 
-    // Stop here if we're not running but queue the animation request for next frame so
-    // this function will be invoked again.
-    if (this.state.lifecycleStage !== LifecycleStage.RUNNING) {
-      requestAnimationFrame(this.onAnimationFrame);
+    // Stop here if we're still starting.
+    if (this.state.lifecycleStage === LifecycleStage.STARTING) {
       return;
     }
 
@@ -139,7 +149,7 @@ export default class StimulusRenderer extends React.Component<
         console.log(
           `Creating stimulus: ${JSON.stringify(this.state.stimulusQueue[0])}`
         );
-        currentStimulus = StimulusFactory.createStimulus(
+        currentStimulus = RendererFactory.createRenderer(
           this.state.stimulusQueue[0],
           this.state.videoInfo
         );
@@ -178,9 +188,6 @@ export default class StimulusRenderer extends React.Component<
     ) {
       this.fetchStimulusBatch();
     }
-
-    // Queue the animation request for next frame so this function will be invoked again.
-    requestAnimationFrame(this.onAnimationFrame);
   }
 
   /*
@@ -207,6 +214,11 @@ export default class StimulusRenderer extends React.Component<
     console.log(
       `## Preloading image set of size: ${this.preloadImageSet.size}`
     );
+    // setTimeout(() => {
+    console.log(`## Pretending images have been preloaded`);
+    this.preloadComplete = true;
+    // }, 3000);
+
     /*
     //const imageSetStr = [...imageSet].join(',');
     // Set of image paths from the main process that need to be preloaded before the run
@@ -261,36 +273,33 @@ export default class StimulusRenderer extends React.Component<
    * that should be displayed and the framework will update the output as necessary.
    */
   render() {
-    console.log(`## Render ${this.renderCount}`);
-    this.renderCount += 1;
-    return null;
-
-    /*
-
-    // Render a blank output if we're out of stimuli and the program is complete.
-    if ((this.state.stimulus === null) &&
-        (this.state.lifecycleStage !== LifecycleStage.RUNNING) {
-      return <div className={styles.containerStopped} />;
+    // Render a blank output before and after the program runs, meaning either
+    // (1) we're still preloading or (2) we're out of stimuli and the program
+    // is complete. This blank output contains the current frame number because
+    // we need to generate a unique frame every time in order to keep data flowing
+    // to the main process.
+    if (
+      !this.preloadComplete ||
+      (this.state.stimulus === null &&
+        this.state.lifecycleStage === LifecycleStage.COMPLETE)
+    ) {
+      return (
+        <div className={styles.containerStopped}>{this.state.frameCount}</div>
+      );
     }
 
-     and
-    // throw an error if we end up starved for stimuli.
-    if (this.state.stimulus === null) {
-      throw new Error('Render loop starved for stimuli');
-    }
-
+    // We're either rendering stimuli or we're waiting on the canvas reference to
+    // become valid so we can start. Create the canvas with the appropriate size.
     let width = 0;
     let height = 0;
     if (this.state.videoInfo !== null) {
       width = this.state.videoInfo.width;
       height = this.state.videoInfo.height;
     }
-
     return (
       <div className={styles.containerRunning}>
         <canvas ref={this.canvasRef} width={width} height={height} />
       </div>
     );
-    */
   }
 }

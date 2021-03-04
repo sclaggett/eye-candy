@@ -1,7 +1,7 @@
-import Stimulus from '../../shared/stimuli/Stimulus';
+import Stimulus from '../types/Stimulus';
 import VideoInfo from '../../shared/VideoInfo';
 
-export default class StimulusBase {
+export default class StimulusRenderer {
   stimulus: Stimulus;
 
   videoInfo: VideoInfo;
@@ -21,7 +21,7 @@ export default class StimulusBase {
     return this.frameNumber < this.frameCount;
   }
 
-  colorToRGB(colorName) {
+  colorToRGB(colorName: string) {
     const canvas: HTMLCanvasElement = document.createElement('canvas');
     const context: CanvasRenderingContext2D | null = canvas.getContext('2d');
     if (context === null) {
@@ -38,21 +38,27 @@ export default class StimulusBase {
       .slice(1)}`;
   }
 
-  hexToRgb(hex) {
+  hexToRgb(hex: string) {
     // Expand shorthand form (e.g. "03F") to full form (e.g. "0033FF")
     const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
-    hexReplace = hex.replace(shorthandRegex, function (m, r, g, b) {
+    const hexReplace = hex.replace(shorthandRegex, function (
+      _m: string,
+      r: string,
+      g: string,
+      b: string
+    ) {
       return r + r + g + g + b + b;
     });
 
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hexReplace);
-    return result
-      ? {
-          r: parseInt(result[1], 16),
-          g: parseInt(result[2], 16),
-          b: parseInt(result[3], 16),
-        }
-      : null;
+    if (!result) {
+      throw new Error('Failed to convert hex to RGB');
+    }
+    return {
+      r: parseInt(result[1], 16),
+      g: parseInt(result[2], 16),
+      b: parseInt(result[3], 16),
+    };
   }
 
   getDiagonalLength(context: CanvasRenderingContext2D) {

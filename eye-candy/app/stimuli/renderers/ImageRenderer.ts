@@ -1,9 +1,9 @@
-import Image from '../../shared/stimuli/Image';
-import Stimulus from '../../shared/stimuli/Stimulus';
-import StimulusBase from './StimulusBase';
+import Image from '../types/Image';
+import Stimulus from '../types/Stimulus';
+import StimulusRenderer from './StimulusRenderer';
 import VideoInfo from '../../shared/VideoInfo';
 
-export default class Image extends StimulusBase {
+export default class ImageRenderer extends StimulusRenderer {
   image: Image;
 
   constructor(stimulus: Stimulus, videoInfo: VideoInfo) {

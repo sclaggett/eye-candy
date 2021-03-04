@@ -15,11 +15,11 @@
 import { app, BrowserWindow, dialog, nativeImage, Rectangle } from 'electron';
 import path from 'path';
 import url from 'url';
-import Image from '../shared/stimuli/Image';
+import Image from '../stimuli/types/Image';
 import MenuBuilder from './menu';
 import ProgramNext from '../shared/ProgramNext';
 import StartProgram from '../shared/StartProgram';
-import Stimulus from '../shared/stimuli/Stimulus';
+import Stimulus from '../stimuli/types/Stimulus';
 import VideoInfo from '../shared/VideoInfo';
 
 const { execFileSync } = require('child_process');
@@ -47,9 +47,10 @@ let stimulusQueue: Stimulus[] = [];
 // Set of all images paths which will be passed to the stimulus window for preloading
 const imageSet = new Set();
 
-// The stimulus window will produce two blank frames before the first image of
-// the program that it is running
-const PRE_FRAME_COUNT = 2;
+// The stimulus window will produce blank frames before the first stimulus image.
+// Retain all images in an array until we're notified of the first frame number.
+let earlyFrameQueue: nativeImage[] = [];
+let firstFrameNumber = -1;
 
 /*
  * Install tools to aid in development and debugging. We use the 'source-map-support'
@@ -165,15 +166,15 @@ function startFrameCleanTimer() {
     if (controlWindow && controlWindow.webContents) {
       controlWindow.webContents.send(
         'runProgress',
-        videoInfo.frameNumber - PRE_FRAME_COUNT - framesProcessing,
-        videoInfo.frameCount - PRE_FRAME_COUNT
+        videoInfo.frameNumber - firstFrameNumber - framesProcessing,
+        videoInfo.frameCount
       );
     }
 
     // Detect when recording is complete and stop the run
     if (
       framesProcessing === 0 &&
-      videoInfo.frameNumber >= videoInfo.frameCount
+      videoInfo.frameNumber >= videoInfo.frameCount + firstFrameNumber
     ) {
       if (frameCleanTimer !== null) {
         clearInterval(frameCleanTimer);
@@ -186,16 +187,39 @@ function startFrameCleanTimer() {
 }
 function frameCaptured(image: nativeImage) {
   // The stimulus window produces a series of blank frames before we get the first
-  // frame of the program which should be skipped
+  // frame of the program. Retain all frames until we know the first frame number.
   if (videoInfo === null) {
     return;
   }
-  if (videoInfo.frameNumber < PRE_FRAME_COUNT) {
+  if (firstFrameNumber === -1) {
+    earlyFrameQueue.push(image);
     videoInfo.frameNumber += 1;
     return;
   }
 
-  // Pass the image to the native layer and remember the ID that it is assigned
+  // Handle the case where we've just been informed of the first frame number. We
+  // detect this by the early frame queue not being empty.
+  if (earlyFrameQueue.length > 0) {
+    // Pass each image since the first frame to the native layer and remember the
+    // IDs that they are assigned
+    for (let i = firstFrameNumber; i < earlyFrameQueue.length; i += 1) {
+      const earlyImage = earlyFrameQueue[i];
+      const size = earlyImage.getSize();
+      const id: number = eyeNative.queueNextFrame(
+        earlyImage.getBitmap(),
+        size.width,
+        size.height
+      );
+      pendingFrames[id] = earlyImage;
+    }
+
+    // Clear the queue and start the frame cleanup timer
+    earlyFrameQueue = [];
+    startFrameCleanTimer();
+  }
+
+  // Pass the new image to the native layer, remember the ID that it is assigned,
+  // and increment the frame number
   const size = image.getSize();
   const id: number = eyeNative.queueNextFrame(
     image.getBitmap(),
@@ -203,12 +227,6 @@ function frameCaptured(image: nativeImage) {
     size.height
   );
   pendingFrames[id] = image;
-
-  // Start the frame cleanup timer if this is the first frame and increment the
-  // frame number
-  if (videoInfo.frameNumber === PRE_FRAME_COUNT) {
-    startFrameCleanTimer();
-  }
   videoInfo.frameNumber += 1;
 }
 
@@ -325,7 +343,6 @@ const createStimulusWindow = async () => {
   stimulusWindow.webContents.on(
     'paint',
     (_event: Event, _dirty: Rectangle, image: nativeImage) => {
-      console.log('## Frame captured');
       frameCaptured(image);
     }
   );
@@ -517,7 +534,7 @@ function generateStimuli() {
 
   // Calculate the total number of frames we expect
   if (videoInfo !== null) {
-    videoInfo.frameCount = PRE_FRAME_COUNT + durationSecs * videoInfo.fps;
+    videoInfo.frameCount = durationSecs * videoInfo.fps;
   }
 }
 function checkFFmpeg() {
@@ -618,6 +635,15 @@ ipcMain.on('startProgram', (_event, stringArg: string) => {
       createStimulusWindow();
     }, 200);
   }, 200);
+});
+
+/**
+ * The "startStimuli" IPC function will be called by the stimulus window with the
+ * number of the first frame containing the first stimulus image. This is necessary
+ * because preloading images can take time so we need to discard early frames.
+ */
+ipcMain.on('startStimuli', (_event, frameNumber: number) => {
+  firstFrameNumber = frameNumber;
 });
 
 /**

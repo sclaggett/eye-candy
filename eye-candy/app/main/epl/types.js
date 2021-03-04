@@ -1,15 +1,15 @@
-import Bar from './types/Bar';
-import Checkerboard from './types/Checkerboard';
-import Chirp from './types/Chirp';
-import EyeChart from './types/EyeChart';
-import Grating from './types/Grating';
-import Image from './types/Image';
-import Letter from './types/Letter';
-import SinusoidalGrating from './types/SinusoidalGrating';
-import Solid from './types/Solid';
-import TiledLetter from './types/TiledLetter';
-import Wait from './types/Wait';
-import WhiteNoise from './types/WhiteNoise';
+import Bar from '../../stimuli/types/Bar';
+import Checkerboard from '../../stimuli/types/Checkerboard';
+import Chirp from '../../stimuli/types/Chirp';
+import EyeChart from '../../stimuli/types/EyeChart';
+import Grating from '../../stimuli/types/Grating';
+import Image from '../../stimuli/types/Image';
+import Letter from '../../stimuli/types/Letter';
+import SinusoidalGrating from '../../stimuli/types/SinusoidalGrating';
+import Solid from '../../stimuli/types/Solid';
+import TiledLetter from '../../stimuli/types/TiledLetter';
+import Wait from '../../stimuli/types/Wait';
+import WhiteNoise from '../../stimuli/types/WhiteNoise';
 
 export {
   Bar,
