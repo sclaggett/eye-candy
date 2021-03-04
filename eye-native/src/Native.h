@@ -9,7 +9,7 @@ namespace native
   void initializeFfmpeg(Napi::Env env, std::string ffmpegPath);
 
   std::string createVideoOutput(Napi::Env env, int width, int height, int fps,
-    std::string encoder, std::string outputPath);
+    std::string outputPath);
   int32_t queueNextFrame(Napi::Env env, uint8_t* frame, size_t length, int width,
     int height);
   std::vector<int32_t> checkCompletedFrames(Napi::Env env);

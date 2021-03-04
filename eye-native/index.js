@@ -47,11 +47,11 @@ function initializeFfmpeg(ffmpegPath) {
  * and close the file when finished.
  */
 
-function createVideoOutput(width, height, fps, encoder, outputPath) {
+function createVideoOutput(width, height, fps, outputPath) {
   if (native === null) {
     throw new Error('Native module has not been initialized');
   }
-  return native.createVideoOutput(width, height, fps, encoder, outputPath);
+  return native.createVideoOutput(width, height, fps, outputPath);
 }
 
 function queueNextFrame(buffer, width, height) {

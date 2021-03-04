@@ -45,11 +45,16 @@ uint32_t PreviewThread::run()
   uint8_t* buffer = 0;
   uint32_t bufferSize = 0;
   uint32_t number, width, height, length;
+  bool closed;
   while (!checkForExit())
   {
     // Read the frame header from the named pipe and extract the fields
-    if (!readAll(namedPipeId, &(frameHeader[0]), FRAME_HEADER_SIZE))
+    if (!readAll(namedPipeId, &(frameHeader[0]), FRAME_HEADER_SIZE, closed))
     {
+      if (closed)
+      {
+        break;
+      }
       printf("[PreviewThread] ERROR: Failed to read header from named pipe\n");
       return 1;
     }
@@ -69,8 +74,12 @@ uint32_t PreviewThread::run()
       bufferSize = length;
       buffer = new uint8_t[bufferSize];
     }
-    if (!readAll(namedPipeId, buffer, length))
+    if (!readAll(namedPipeId, buffer, length, closed))
     {
+      if (closed)
+      {
+        break;
+      }
       printf("[PreviewThread] ERROR: Failed to read frame from named pipe\n");
       return 1;
     }
@@ -86,12 +95,12 @@ uint32_t PreviewThread::run()
   return 0;
 }
 
-bool PreviewThread::readAll(uint64_t file, uint8_t* buffer, uint32_t length)
+bool PreviewThread::readAll(uint64_t file, uint8_t* buffer, uint32_t length, bool& closed)
 {
   uint32_t bytesRead = 0;
   while (bytesRead < length)
   {
-    int32_t ret = platform::read(file, buffer + bytesRead, length - bytesRead);
+    int32_t ret = platform::read(file, buffer + bytesRead, length - bytesRead, closed);
     if (ret == -1)
     {
       return false;

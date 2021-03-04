@@ -11,7 +11,7 @@ class FfmpegProcess : public Thread
 {
 public:
   FfmpegProcess(std::string executable, uint32_t width, uint32_t height, uint32_t fps,
-    std::string encoder, std::string outputPath);
+    std::string outputPath);
   virtual ~FfmpegProcess() {};
 
 public:

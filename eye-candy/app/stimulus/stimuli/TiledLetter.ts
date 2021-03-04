@@ -1,4 +1,4 @@
-import Stimulus from '../../shared/Stimulus';
+import Stimulus from '../../shared/stimuli/Stimulus';
 import StimulusBase from './StimulusBase';
 import VideoInfo from '../../shared/VideoInfo';
 
@@ -34,43 +34,50 @@ export default class TiledLetter extends StimulusBase {
     context.save();
     this.renderBackground(context);
 
-    /*
-    var canvasPattern = document.createElement("canvas");
+    const canvasPattern: HTMLCanvasElement = document.createElement('canvas');
     canvasPattern.width = this.size + this.padding;
     canvasPattern.height = this.size + this.padding;
-    var contextPattern = canvasPattern.getContext("2d");
+    const contextPattern: CanvasRenderingContext2D | null = canvasPattern.getContext(
+      '2d'
+    );
+    if (contextPattern === null) {
+      throw new Error('Failed to get context');
+    }
 
     contextPattern.fillStyle = this.backgroundColor;
     contextPattern.fillRect(0, 0, canvasPattern.width, canvasPattern.height);
 
     contextPattern.fillStyle = this.color;
-    contextPattern.font = this.size + 'px Sloan';
-    contextPattern.fillText(this.letter, this.padding / 2, this.padding / 2 + this.size);
+    contextPattern.font = `${this.size}px Sloan`;
+    contextPattern.fillText(
+      this.letter,
+      this.padding / 2,
+      this.padding / 2 + this.size
+    );
 
-    var pattern = context.createPattern(canvasPattern, "repeat");
-
-    store.dispatch(addGraphicAC({
-        graphicType: GRAPHIC.PATTERN,
-        pattern: pattern,
-        angle: angle,
-        lifespan: lifespan,
-        age: 0
-    }))
-
-export function renderPattern(context, pattern,angle) {
-    context.fillStyle = pattern;
-    const diag = getDiagonalLength()
-    if (angle===0) {
-        context.fillRect(0,0, diag, diag);
-    } else  {
-        context.translate(WIDTH/2,HEIGHT/2)
-        context.rotate(-angle)
-        context.translate(-diag/2,-diag/2)
-        context.fillRect(0,0, diag, diag);
+    const pattern: CanvasPattern | null = context.createPattern(
+      canvasPattern,
+      'repeat'
+    );
+    if (pattern === null) {
+      throw new Error('Failed to create pattern');
     }
 
-}
-*/
+    context.fillStyle = pattern;
+
+    const diag = Math.sqrt(
+      context.canvas.width ** 2 + context.canvas.height ** 2
+    );
+
+    if (this.angle === 0) {
+      context.fillRect(0, 0, diag, diag);
+    } else {
+      context.translate(context.canvas.width / 2, context.canvas.height / 2);
+      context.rotate(-this.angle);
+      context.translate(-diag / 2, -diag / 2);
+      context.fillRect(0, 0, diag, diag);
+    }
+
     context.restore();
     context.fillStyle = 'red';
     context.font = '16px Arial';

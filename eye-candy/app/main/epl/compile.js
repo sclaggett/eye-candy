@@ -17,6 +17,7 @@ const Types = require('./types');
 const Render = require('./render');
 const Random = require('./random');
 const Misc = require('./misc');
+const Generators = require('./generators');
 const math = require('./math');
 
 // this object has all values usable in EPL
@@ -29,6 +30,7 @@ const EPL = {
   ...Random,
   ...math,
   ...Misc,
+  ...Generators,
 };
 
 function compile(

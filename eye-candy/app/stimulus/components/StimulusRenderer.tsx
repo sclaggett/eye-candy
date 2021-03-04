@@ -1,6 +1,5 @@
 import React from 'react';
-import * as styles from './StimulusRenderer.css';
-import Stimulus from '../../shared/Stimulus';
+import Stimulus from '../../shared/stimuli/Stimulus';
 import StimulusBase from '../stimuli/StimulusBase';
 import StimulusFactory from '../stimuli/StimulusFactory';
 import VideoInfo from '../../shared/VideoInfo';
@@ -13,9 +12,9 @@ type StimulusRendererProps = {
 
 /*
  * This component's lifecycle consists of three stages:
- *  1. Starting: For frames 1 and 2, the component hasn't fully initialized the stimulus
- *     queue. Also, for frame 1, the component doesn't have a reference to the canvas
- *     element yet. These first two frames need to be discarded by the encoder.
+ *  1. Starting: The state where we're initializing the stimulus list and preloading images.
+ *     This also covers the frame or two it takes for the component to get a reference to the
+ *     canvas element. These frames need to be discarded by the encoder.
  *  2. Running: Stimuli are being rendered to the browser window at exactly one stimulus
  *     tick per frame.
  *  3. Complete: The program is complete and no more stimuli exist to be rendered.
@@ -41,6 +40,25 @@ export default class StimulusRenderer extends React.Component<
   StimulusRendererProps,
   StimulusRendererState
 > {
+  // Number of times the render() function has been called
+  renderCount: number;
+
+  // Set of image paths from the main process that need to be preloaded before the run
+  // can start
+  preloadImageSet: Set<string>;
+
+  // Number of images that are preloading, have been preloaded
+  imagesPreloading: number;
+
+  imagesPreloaded: number;
+
+  // A flag that indicates when preloading is complete and a map between the image paths
+  // on disk and the corresponding preloaded internal URLs
+  preloadComplete: boolean;
+
+  preloadedImages: Record<string, string>;
+
+  // Reference to the canvas where the stimuli will be drawn
   canvasRef: React.RefObject<HTMLCanvasElement>;
 
   constructor(props: StimulusRendererProps) {
@@ -53,6 +71,13 @@ export default class StimulusRenderer extends React.Component<
       stimulusQueue: [],
     };
 
+    this.renderCount = 0;
+    this.preloadImageSet = new Set();
+    this.imagesPreloading = 0;
+    this.imagesPreloaded = 0;
+    this.preloadComplete = false;
+    this.preloadedImages = {};
+
     this.onAnimationFrame = this.onAnimationFrame.bind(this);
 
     this.canvasRef = React.createRef<HTMLCanvasElement>();
@@ -61,12 +86,13 @@ export default class StimulusRenderer extends React.Component<
   /*
    * The componentDidMount() function is invoked when the component is mounted in the
    * DOM and is a good spot to perform class initialization. Retrieve the video
-   * inforation and the initial list of stimuli from the main process and queue an
-   * animation request so onAnimationFrame() will be called before the next frame
-   * is rendered.
+   * inforation, a list of images that need to be preloaded, and the initial list of
+   * stimuli from the main process and queue an animation request so onAnimationFrame()
+   * will be called before the next frame is rendered.
    */
   componentDidMount() {
     this.fetchVideoInfo();
+    this.fetchImageSet();
     this.fetchStimulusBatch();
     requestAnimationFrame(this.onAnimationFrame);
   }
@@ -79,16 +105,26 @@ export default class StimulusRenderer extends React.Component<
    * call to render().
    */
   onAnimationFrame(_timestamp: number) {
-    // Detect the lifecycle change from starting to running based on whether we have a
-    // canvas reference or not, which in turn influences whether the render() function will
-    // show the canvas or not.
+    console.log('## Animation frame');
+
+    // Detect the lifecycle change from starting to running based on whether all images have
+    // been preloaded and we have a canvas reference or not. The lifecycle stage in turn
+    // influences whether the render() function will show the canvas or not.
     if (
+      this.preloadComplete &&
       this.canvasRef.current !== null &&
       this.state.lifecycleStage === LifecycleStage.STARTING
     ) {
       this.setState({
         lifecycleStage: LifecycleStage.RUNNING,
       });
+    }
+
+    // Stop here if we're not running but queue the animation request for next frame so
+    // this function will be invoked again.
+    if (this.state.lifecycleStage !== LifecycleStage.RUNNING) {
+      requestAnimationFrame(this.onAnimationFrame);
+      return;
     }
 
     // Advance to the next stimulus if the current one has no more frames left to render.
@@ -158,6 +194,37 @@ export default class StimulusRenderer extends React.Component<
   }
 
   /*
+   * The fetchImageSet() function retrieves a list of all images associated with this
+   * program so they can be preloaded. It then triggers the preloading process by
+   * calling the function preloadImages().
+   */
+  fetchImageSet() {
+    this.preloadImageSet = ipc.sendSync('getImageSet') as Set<string>;
+    this.preloadImages();
+  }
+
+  preloadImages() {
+    console.log(
+      `## Preloading image set of size: ${this.preloadImageSet.size}`
+    );
+    /*
+    //const imageSetStr = [...imageSet].join(',');
+    // Set of image paths from the main process that need to be preloaded before the run
+    // can start
+    imageSet: Set<string>;
+
+    // Map of image paths on disk to URLs internal to the browser
+    images: Record<string, string>;
+
+    // Number of images that are loading, have been loaded, and a flag to indicate loading
+    // is complete
+    imagesLoading = 0;
+    imagesLoaded = 0;
+    preloadComplete = false;
+    */
+  }
+
+  /*
    * The fetchStimulusBatch() function retrieves the next batch of stimuli from the main
    * process and saves them to the state. It detects the end of the program and sets the
    * corresponding flag in the state.
@@ -194,12 +261,21 @@ export default class StimulusRenderer extends React.Component<
    * that should be displayed and the framework will update the output as necessary.
    */
   render() {
-    // Render a blank output if we're out of stimuli and the program is complete and
+    console.log(`## Render ${this.renderCount}`);
+    this.renderCount += 1;
+    return null;
+
+    /*
+
+    // Render a blank output if we're out of stimuli and the program is complete.
+    if ((this.state.stimulus === null) &&
+        (this.state.lifecycleStage !== LifecycleStage.RUNNING) {
+      return <div className={styles.containerStopped} />;
+    }
+
+     and
     // throw an error if we end up starved for stimuli.
     if (this.state.stimulus === null) {
-      if (this.state.lifecycleStage !== LifecycleStage.RUNNING) {
-        return <div className={styles.containerStopped} />;
-      }
       throw new Error('Render loop starved for stimuli');
     }
 
@@ -215,5 +291,6 @@ export default class StimulusRenderer extends React.Component<
         <canvas ref={this.canvasRef} width={width} height={height} />
       </div>
     );
+    */
   }
 }

@@ -1,9 +1,9 @@
-import Stimulus from '../../shared/Stimulus';
+import Stimulus from '../../shared/stimuli/Stimulus';
 import StimulusBase from './StimulusBase';
 import VideoInfo from '../../shared/VideoInfo';
 
 export default class EyeChart extends StimulusBase {
-  letterMatrix: string[];
+  letterMatrix: string[][];
 
   size: number;
 
@@ -27,6 +27,20 @@ export default class EyeChart extends StimulusBase {
   render(context: CanvasRenderingContext2D) {
     context.save();
     this.renderBackground(context);
+
+    const fullSize = this.size + this.padding;
+    const numberOfRows = Math.ceil(context.canvas.clientHeight / fullSize);
+    const numberOfCols = Math.ceil(context.canvas.clientWidth / fullSize);
+
+    for (let i = 0; i < numberOfRows; i += 1) {
+      for (let j = 0; j < numberOfCols; j += 1) {
+        context.fillStyle = this.color;
+        context.font = `${this.size}px Sloan`;
+        const x = j * fullSize + this.padding / 2;
+        const y = i * fullSize + this.size + this.padding / 2;
+        context.fillText(this.letterMatrix[i][j], x, y);
+      }
+    }
 
     context.restore();
     context.fillStyle = 'red';

@@ -165,7 +165,7 @@ bool platform::createNamedPipeForWriting(string channelName, uint64_t& pipeId,
     PIPE_TYPE_BYTE | PIPE_NOWAIT, 1, 0, 0, 0, NULL);
   if (pipe == INVALID_HANDLE_VALUE)
   {
-    printf("[Platform_Win] ERROR: Failed to create named pipe for writing\n");
+    printf("[Platform_Win] ERROR: Failed to create named pipe for writing (%i)\n", GetLastError());
     return false;
   }
   pipeId = (uint64_t)pipe;
@@ -192,7 +192,7 @@ bool platform::openNamedPipeForWriting(uint64_t pipeId, bool& opened)
   }
   else
   {
-    printf("[Platform_Win] ERROR: Failed to open named pipe for writing\n");
+    printf("[Platform_Win] ERROR: Failed to open named pipe for writing (%i)\n", err);
     return false;
   }
 }
@@ -213,7 +213,7 @@ bool platform::openNamedPipeForReading(string channelName, uint64_t& pipeId, boo
     fileNotFound = (GetLastError() == ERROR_FILE_NOT_FOUND);
     if (!fileNotFound)
     {
-      printf("[Platform_Win] ERROR: Failed to open named pipe for reading\n");
+      printf("[Platform_Win] ERROR: Failed to open named pipe for reading (%i)\n", GetLastError());
     }
     return false;
   }
@@ -233,12 +233,16 @@ int32_t platform::waitForData(uint64_t file, uint32_t timeoutMs)
   return (int32_t)file;
 }
 
-int32_t platform::read(uint64_t file, uint8_t* buffer, uint32_t maxLength)
+int32_t platform::read(uint64_t file, uint8_t* buffer, uint32_t maxLength, bool& closed)
 {
   DWORD dwRead = 0;
   if (!ReadFile((HANDLE)file, buffer, maxLength, &dwRead, NULL))
   {
-    printf("[Platform_Win] ERROR: Failed to read from file or pipe\n");
+    closed = (GetLastError() == ERROR_BROKEN_PIPE);
+    if (!closed)
+    {
+      printf("[Platform_Win] ERROR: Failed to read from file or pipe (%i)\n", GetLastError());
+    }
     return -1;
   }
   return (int32_t)dwRead;
@@ -249,7 +253,7 @@ int32_t platform::write(uint64_t file, const uint8_t* buffer, uint32_t length)
   DWORD dwWritten = 0;
   if (!WriteFile((HANDLE)file, buffer, length, &dwWritten, NULL))
   {
-    printf("[Platform_Win] ERROR: Failed to write to file or pipe\n");
+    printf("[Platform_Win] ERROR: Failed to write to file or pipe (%i)\n", GetLastError());
     return -1;
   }
   return dwWritten;

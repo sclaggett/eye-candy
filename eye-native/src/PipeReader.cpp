@@ -20,6 +20,7 @@ string PipeReader::getData()
 uint32_t PipeReader::run()
 {
   char buffer[1024];
+  bool closed;
   while (!checkForExit())
   {
     // Wait for data to become available to read and continue around the loop if nothing
@@ -36,10 +37,13 @@ uint32_t PipeReader::run()
     }
 
     // Read data from the pipe and append it to the data string
-    ret = platform::read(file, (uint8_t*)&(buffer[0]), 1023);
+    ret = platform::read(file, (uint8_t*)&(buffer[0]), 1023, closed);
     if (ret == -1)
     {
-      printf("[PipeReader] ERROR: Failed to read from pipe\n");
+      if (!closed)
+      {
+        printf("[PipeReader] ERROR: Failed to read from pipe\n");
+      }
       break;
     }
     else if (ret > 0)

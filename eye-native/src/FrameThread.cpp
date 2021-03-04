@@ -84,7 +84,7 @@ uint32_t FrameThread::run()
       bool opened = false;
       if (!platform::openNamedPipeForWriting(namedPipeId, opened))
       {
-        printf("[FrameThread] ERROR: Named pipe connetion failed\n");
+        printf("[FrameThread] ERROR: Named pipe connection failed\n");
         channelState = CHANNEL_ERROR;
         continue;
       }

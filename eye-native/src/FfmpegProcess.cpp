@@ -5,12 +5,12 @@
 using namespace std;
 
 FfmpegProcess::FfmpegProcess(string exec, uint32_t width, uint32_t height, uint32_t fps,
-    string encoder, string outputPath) :
+    string outputPath) :
   Thread("ffmpeg"),
   executable(exec)
 {
   // Check options using:
-  //   ffmpeg -h encoder=h264_videotoolbox
+  //   ffmpeg -h encoder=libx264
 
   // Input options
   arguments.push_back("-f");
@@ -30,18 +30,22 @@ FfmpegProcess::FfmpegProcess(string exec, uint32_t width, uint32_t height, uint3
 
   // Output options
   arguments.push_back("-c:v");
-  arguments.push_back(encoder);
+  arguments.push_back("libx264");
 
-  arguments.push_back("-profile:v");
+  arguments.push_back("-profile");
   arguments.push_back("high");
+
+  arguments.push_back("-preset");
+  arguments.push_back("veryfast");
+
+  arguments.push_back("-crf");
+  arguments.push_back("18");
 
   arguments.push_back("-pix_fmt");
   arguments.push_back("yuv420p");
 
-  arguments.push_back("-realtime");
-  arguments.push_back("true");
-
   arguments.push_back("-y");
+  
   arguments.push_back(outputPath);
 }
 
@@ -97,10 +101,8 @@ uint32_t FfmpegProcess::run()
       }
     }
   }
-  if (!stdoutReader->terminate() || !stderrReader->terminate())
-  {
-    printf("[FfmpegProcess] WARN: Failed to terminate reader threads\n");
-  }
+  stdoutReader->terminate();
+  stderrReader->terminate();
   cleanUpProcess();
   return 0;
 }

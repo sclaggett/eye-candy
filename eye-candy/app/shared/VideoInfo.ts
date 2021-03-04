@@ -19,8 +19,6 @@ export default class VideoInfo {
 
   fps: number;
 
-  encoder: string;
-
   outputPath: string;
 
   frameCount: number;
@@ -37,7 +35,6 @@ export default class VideoInfo {
     this.height = 0;
     this.ffmpegPath = '';
     this.fps = 0;
-    this.encoder = '';
     this.outputPath = '';
     this.frameCount = 0;
     this.frameNumber = 0;

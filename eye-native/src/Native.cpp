@@ -29,8 +29,7 @@ void native::initializeFfmpeg(Napi::Env env, string ffmpegPath)
   gInitialized = true;
 }
 
-string native::createVideoOutput(Napi::Env env, int width, int height, int fps, string encoder,
-  string outputPath)
+string native::createVideoOutput(Napi::Env env, int width, int height, int fps, string outputPath)
 {
   // Make sure we've been initialized and aren't currently recording
   if (!gInitialized)
@@ -44,7 +43,7 @@ string native::createVideoOutput(Napi::Env env, int width, int height, int fps, 
 
   // Spawn the ffmpeg process
   gFfmpegProcess = shared_ptr<FfmpegProcess>(new FfmpegProcess(gFfmpegPath, width, height,
-    fps, encoder, outputPath));
+    fps, outputPath));
   gFfmpegProcess->spawn();
 
   // Spawn the thread that will feed frames to the ffmpeg process

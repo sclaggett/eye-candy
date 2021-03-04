@@ -85,6 +85,7 @@ export default class Control extends React.Component<
     this.logTextArea = React.createRef();
     this.previewContainer = React.createRef();
     this.previewInterval = null;
+    this.programDirectory = '';
 
     // Bind the IPC handlers and other callbacks so "this" will be defined when
     // they are invoked
@@ -378,8 +379,12 @@ export default class Control extends React.Component<
     frameNumber: number,
     framesTotal: number
   ) {
+    let progress = Math.round((frameNumber * 100) / framesTotal);
+    if (progress > 100) {
+      progress = 100;
+    }
     this.setState(({
-      progress: Math.round((frameNumber * 100) / framesTotal),
+      progress,
     } as unknown) as ControlState);
   }
 

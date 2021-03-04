@@ -1,4 +1,4 @@
-import Stimulus from '../../shared/Stimulus';
+import Stimulus from '../../shared/stimuli/Stimulus';
 import StimulusBase from './StimulusBase';
 import VideoInfo from '../../shared/VideoInfo';
 
@@ -19,6 +19,37 @@ export default class WhiteNoise extends StimulusBase {
   render(context: CanvasRenderingContext2D) {
     context.save();
     this.renderBackground(context);
+
+    const canvasPattern: HTMLCanvasElement = document.createElement('canvas');
+    canvasPattern.width = context.canvas.width;
+    canvasPattern.height = context.canvas.height;
+    const contextPattern: CanvasRenderingContext2D | null = canvasPattern.getContext(
+      '2d'
+    );
+    if (contextPattern === null) {
+      throw new Error('Failed to get context');
+    }
+
+    const nVals = this.cols * this.rows;
+    const flatPixelArray = new Uint8ClampedArray(nVals * 4);
+    for (let p = 0; p < nVals; p += 1) {
+      const val = randn_bm();
+      flatPixelArray[p * 4] = val; // red
+      flatPixelArray[p * 4 + 1] = val; // green
+      flatPixelArray[p * 4 + 2] = val; // blue
+      flatPixelArray[p * 4 + 3] = 255; // alpha
+    }
+    const imageData = new ImageData(flatPixelArray, this.cols, this.rows);
+    contextPattern.putImageData(imageData, 0, 0);
+
+    context.imageSmoothingEnabled = false;
+    context.drawImage(
+      imageData,
+      0,
+      0,
+      context.canvas.width,
+      context.canvas.height
+    );
 
     context.restore();
     context.fillStyle = 'red';

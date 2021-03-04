@@ -1,4 +1,4 @@
-import Stimulus from '../../shared/Stimulus';
+import Stimulus from '../../shared/stimuli/Stimulus';
 import StimulusBase from './StimulusBase';
 import VideoInfo from '../../shared/VideoInfo';
 

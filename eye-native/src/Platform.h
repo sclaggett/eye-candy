@@ -27,7 +27,7 @@ namespace platform
   void closeNamedPipeForReading(uint64_t pipeId);
 
   int32_t waitForData(uint64_t file, uint32_t timeoutMs);
-  int32_t read(uint64_t file, uint8_t* buffer, uint32_t maxLength);
+  int32_t read(uint64_t file, uint8_t* buffer, uint32_t maxLength, bool& closed);
   int32_t write(uint64_t file, const uint8_t* buffer, uint32_t length);
   void close(uint64_t file);
 }

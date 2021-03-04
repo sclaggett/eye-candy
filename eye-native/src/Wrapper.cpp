@@ -37,12 +37,11 @@ void wrapper::initializeFfmpeg(const Napi::CallbackInfo& info)
 Napi::String wrapper::createVideoOutput(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
-  if ((info.Length() != 5) ||
+  if ((info.Length() != 4) ||
     !info[0].IsNumber() ||
     !info[1].IsNumber() ||
     !info[2].IsNumber() ||
-    !info[3].IsString() ||
-    !info[4].IsString())
+    !info[3].IsString())
   {
     Napi::TypeError::New(env, "Incorrect parameter type").ThrowAsJavaScriptException();
     return Napi::String();
@@ -50,10 +49,9 @@ Napi::String wrapper::createVideoOutput(const Napi::CallbackInfo& info)
   Napi::Number width = info[0].As<Napi::Number>();
   Napi::Number height = info[1].As<Napi::Number>();
   Napi::Number fps = info[2].As<Napi::Number>();
-  Napi::String encoder = info[3].As<Napi::String>();
-  Napi::String outputPath = info[4].As<Napi::String>();
+  Napi::String outputPath = info[3].As<Napi::String>();
   return Napi::String::New(env, native::createVideoOutput(env, width, height, fps,
-    encoder, outputPath));
+    outputPath));
 }
 
 Napi::Number wrapper::queueNextFrame(const Napi::CallbackInfo& info)

@@ -12,13 +12,14 @@
  * Any log statements will be written to the terminal window.
  */
 
-import path from 'path';
 import { app, BrowserWindow, dialog, nativeImage, Rectangle } from 'electron';
+import path from 'path';
 import url from 'url';
+import Image from '../shared/stimuli/Image';
 import MenuBuilder from './menu';
 import ProgramNext from '../shared/ProgramNext';
 import StartProgram from '../shared/StartProgram';
-import Stimulus from '../shared/Stimulus';
+import Stimulus from '../shared/stimuli/Stimulus';
 import VideoInfo from '../shared/VideoInfo';
 
 const { execFileSync } = require('child_process');
@@ -42,6 +43,9 @@ let program: Record<string, any> | null = null;
 
 // Queue of stimuli that haven't been played yet
 let stimulusQueue: Stimulus[] = [];
+
+// Set of all images paths which will be passed to the stimulus window for preloading
+const imageSet = new Set();
 
 // The stimulus window will produce two blank frames before the first image of
 // the program that it is running
@@ -121,6 +125,7 @@ function runStopped() {
   // Reset internal state variables
   program = null;
   stimulusQueue = [];
+  imageSet.clear();
 
   // Notify the control window
   if (controlWindow && controlWindow.webContents) {
@@ -136,7 +141,7 @@ function runStopped() {
  * 10 ms intervals.
  */
 const pendingFrames: { [index: string]: any } = {};
-let frameCleanTimer: ReturnType<typeof setTimeout> | null = null;
+let frameCleanTimer: ReturnType<typeof setInterval> | null = null;
 function startFrameCleanTimer() {
   if (frameCleanTimer !== null) {
     throw new Error('Frame clean time is already running');
@@ -170,8 +175,10 @@ function startFrameCleanTimer() {
       framesProcessing === 0 &&
       videoInfo.frameNumber >= videoInfo.frameCount
     ) {
-      clearInterval(frameCleanTimer);
-      frameCleanTimer = null;
+      if (frameCleanTimer !== null) {
+        clearInterval(frameCleanTimer);
+        frameCleanTimer = null;
+      }
       log('Program complete\n');
       runStopped();
     }
@@ -318,6 +325,7 @@ const createStimulusWindow = async () => {
   stimulusWindow.webContents.on(
     'paint',
     (_event: Event, _dirty: Rectangle, image: nativeImage) => {
+      console.log('## Frame captured');
       frameCaptured(image);
     }
   );
@@ -443,7 +451,7 @@ function compileProgram() {
       videoInfo.width,
       videoInfo.height,
       '/data/',
-      (message) => {
+      (message: string) => {
         log(`[epl] ${message}\n`);
       }
     );
@@ -468,9 +476,10 @@ function compileProgram() {
   return true;
 }
 function generateStimuli() {
-  // Generate all stimuli and keep track of the total duration. Note that this process may
-  // need to be broken down into multiple steps for longer programs to prevent locking up
-  // the application for longer periods of time.
+  // Generate all stimuli while keeping track of a what images need to be preloaded and
+  // the total duration of the program. Note that this process may need to be broken down
+  // into multiple steps for longer programs to prevent locking up the application for
+  // unacceptable periods of time.
   if (!program) {
     throw new Error('Program not defined');
   }
@@ -486,6 +495,9 @@ function generateStimuli() {
     const stimulus: Stimulus = response.value as Stimulus;
     durationSecs += stimulus.lifespan;
     stimulusQueue.push(stimulus);
+    if (stimulus.stimulusType === 'IMAGE') {
+      imageSet.add((stimulus as Image).image);
+    }
   }
 
   // Log the total duration
@@ -523,11 +535,11 @@ function checkFFmpeg() {
 
   // Check the FFmpeg version
   log('Detecting FFmpeg version...\n');
-  let result: string = execFileSync(videoInfo.ffmpegPath, [
+  const result: string = execFileSync(videoInfo.ffmpegPath, [
     '-hide_banner',
     '-version',
   ]);
-  let lines = result.toString().split(/\r?\n/);
+  const lines = result.toString().split(/\r?\n/);
   let version = '';
   for (let i = 0; i < lines.length; i += 1) {
     if (lines[i].includes('ffmpeg version')) {
@@ -542,55 +554,6 @@ function checkFFmpeg() {
   }
   log(`Detected version ${version}\n`);
 
-  // We prefer to use a specialized hardware chip to encode H.264 video if one is
-  // available. Determine the name of the hardware encoder by checking the platform
-  let hwEncoder = '';
-  if (process.platform === 'darwin') {
-    hwEncoder = 'h264_videotoolbox';
-  }
-  const swEncoder = 'libx264';
-
-  // Check if ffmpeg supports the hardware and software encoders
-  log('Detecting H.264 encoders...\n');
-  result = execFileSync(videoInfo.ffmpegPath, ['-hide_banner', '-encoders']);
-  lines = result.toString().split(/\r?\n/);
-  let hwEncoderFound = false;
-  let swEncoderFound = false;
-  for (let i = 0; i < lines.length; i += 1) {
-    if (hwEncoder !== '' && lines[i].includes(hwEncoder)) {
-      hwEncoderFound = true;
-    }
-    if (lines[i].includes(swEncoder)) {
-      swEncoderFound = true;
-    }
-  }
-  if (hwEncoderFound) {
-    log('Hardware encoder found\n');
-    videoInfo.encoder = hwEncoder;
-  } else if (swEncoderFound) {
-    log('Hardware encoder not found, falling back to software encoding\n');
-    videoInfo.encoder = swEncoder;
-  } else {
-    log('Error: Failed to detect a suitable H.264 encoder\n');
-    return false;
-  }
-
-  // Make sure ffmpeg supports the mp4 file format
-  log('Checking output format...\n');
-  result = execFileSync(videoInfo.ffmpegPath, ['-hide_banner', '-muxers']);
-  lines = result.toString().split(/\r?\n/);
-  let mp4FormatFound = false;
-  for (let i = 0; i < lines.length; i += 1) {
-    if (lines[i].includes('mp4')) {
-      mp4FormatFound = true;
-      break;
-    }
-  }
-  if (!mp4FormatFound) {
-    log('Error: Failed to find support for MP4 format\n');
-    return false;
-  }
-
   return true;
 }
 function spawnFFmpeg() {
@@ -604,7 +567,6 @@ function spawnFFmpeg() {
     videoInfo.width,
     videoInfo.height,
     videoInfo.fps,
-    videoInfo.encoder,
     videoInfo.outputPath
   );
   if (result !== '') {
@@ -680,6 +642,15 @@ ipcMain.on('endProgram', (_event) => {});
  */
 ipcMain.on('getVideoInfo', (event) => {
   event.returnValue = JSON.stringify(videoInfo);
+});
+
+/**
+ * The "getImageSet" IPC function will be called by the stimulus window to retrieve a
+ * list of all images that need to be preloaded before the run begin.
+ */
+ipcMain.on('getImageSet', (event) => {
+  console.log(`## Send image set of size: ${imageSet.size}`);
+  event.returnValue = imageSet;
 });
 
 /**
