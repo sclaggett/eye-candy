@@ -243,7 +243,8 @@ int32_t platform::waitForData(uint64_t file, uint32_t timeoutMs)
   return select(file + 1, &set, NULL, NULL, &timeout);
 }
 
-int32_t platform::read(uint64_t file, uint8_t* buffer, uint32_t maxLength)
+int32_t platform::read(uint64_t file, uint8_t* buffer, uint32_t maxLength,
+  bool& closed)
 {
   return ::read((int)file, buffer, maxLength);
 }

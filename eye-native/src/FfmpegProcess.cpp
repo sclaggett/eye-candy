@@ -32,14 +32,11 @@ FfmpegProcess::FfmpegProcess(string exec, uint32_t width, uint32_t height, uint3
   arguments.push_back("-c:v");
   arguments.push_back("libx264");
 
-  arguments.push_back("-profile");
+  arguments.push_back("-profile:v");
   arguments.push_back("high");
 
-  arguments.push_back("-preset");
-  arguments.push_back("veryfast");
-
   arguments.push_back("-crf");
-  arguments.push_back("18");
+  arguments.push_back("10");
 
   arguments.push_back("-pix_fmt");
   arguments.push_back("yuv420p");
