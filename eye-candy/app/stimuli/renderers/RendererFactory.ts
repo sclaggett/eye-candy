@@ -14,7 +14,11 @@ import WaitRenderer from './WaitRenderer';
 import WhiteNoiseRenderer from './WhiteNoiseRenderer';
 
 export default class StimulusFactory {
-  static createRenderer(stimulus: Stimulus, videoInfo: VideoInfo) {
+  static createRenderer(
+    stimulus: Stimulus,
+    videoInfo: VideoInfo,
+    preloadedImages: Map<string, ImageBitmap>
+  ) {
     switch (stimulus.stimulusType) {
       case 'BAR':
         return new BarRenderer(stimulus, videoInfo);
@@ -32,7 +36,7 @@ export default class StimulusFactory {
         return new GratingRenderer(stimulus, videoInfo);
 
       case 'IMAGE':
-        return new ImageRenderer(stimulus, videoInfo);
+        return new ImageRenderer(stimulus, videoInfo, preloadedImages);
 
       case 'LETTER':
         return new LetterRenderer(stimulus, videoInfo);

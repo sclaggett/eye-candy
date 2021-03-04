@@ -638,15 +638,6 @@ ipcMain.on('startProgram', (_event, stringArg: string) => {
 });
 
 /**
- * The "startStimuli" IPC function will be called by the stimulus window with the
- * number of the first frame containing the first stimulus image. This is necessary
- * because preloading images can take time so we need to discard early frames.
- */
-ipcMain.on('startStimuli', (_event, frameNumber: number) => {
-  firstFrameNumber = frameNumber;
-});
-
-/**
  * The "cancelProgram" IPC function will be called by the control window when the user
  * wants to cancel the running EPL program.
  */
@@ -656,11 +647,22 @@ ipcMain.on('cancelProgram', (_event) => {
 });
 
 /**
- * The "endProgram" IPC function will be called by the stimulus window when it has
- * run out of stimuli to render. This function simply sets the flag and the encoding
- * process will be closed once all frames have been processed.
+ * The "startStimuli" IPC function will be called by the stimulus window with the
+ * number of the first frame containing the first stimulus image. This is necessary
+ * because preloading images can take time so we need to discard early frames.
  */
-ipcMain.on('endProgram', (_event) => {});
+ipcMain.on('startStimuli', (_event, frameNumber: number) => {
+  firstFrameNumber = frameNumber;
+});
+
+/**
+ * The "programFailure" IPC function will be called by the stimulus window if the
+ * program encounters a fatal error.
+ */
+ipcMain.on('programFailure', (_event, message: string) => {
+  log(`Program failure: ${message}`);
+  runStopped();
+});
 
 /**
  * The "getVideoInfo" IPC function will be called by the stimulus window to retrieve

@@ -6,19 +6,23 @@ import VideoInfo from '../../shared/VideoInfo';
 export default class ImageRenderer extends StimulusRenderer {
   image: Image;
 
-  constructor(stimulus: Stimulus, videoInfo: VideoInfo) {
+  preloadedImage: ImageBitmap;
+
+  constructor(
+    stimulus: Stimulus,
+    videoInfo: VideoInfo,
+    preloadedImages: Map<string, ImageBitmap>
+  ) {
     super(stimulus, videoInfo);
     this.image = stimulus as Image;
-    /*
-    console.log(
-      `Created Image stimulus which will run for ${stimulus.lifespan} seconds at ${videoInfo.fps} fps for a total of ${this.frameCount} frames`
-    );
-    */
+    const image = preloadedImages.get(this.image.image);
+    if (image === undefined) {
+      throw new Error(`Image ${this.image.image} not found in preload cache`);
+    }
+    this.preloadedImage = image;
 
     console.log(
-      `## Image = ${this.image.image}, fixationPoint = ${JSON.stringify(
-        this.image.fixationPoint
-      )}, scale = ${JSON.stringify(this.image.scale)}`
+      `Created Image stimulus which will run for ${stimulus.lifespan} seconds at ${videoInfo.fps} fps for a total of ${this.frameCount} frames`
     );
   }
 
@@ -26,69 +30,23 @@ export default class ImageRenderer extends StimulusRenderer {
     context.save();
     this.renderBackground(context);
 
-    /*
-function imageDispatcher(lifespan, backgroundColor, image,
-                         fixationPoint, scale) {
-    // let img = new Image()
-    // deleting onload messes up image src on server if the path is not
-    // available for example or if image simply hasn't loaded yet
-    // img.onload = (event) => {
-    //     if (fixationPoint===undefined) {
-    //         fixationPoint = {x: img.width / 2, y: img.height / 2}
-    //     }
-    //     store.dispatch(setGraphicsAC([{
-    //             graphicType: GRAPHIC.IMAGE,
-    //             image: img,
-    //             fixationPoint: fixationPoint,
-    //             scale: scale,
-    //             lifespan: lifespan,
-    //             age: 0
-    //     }]))
-    // }
-    // if (typeof(image)==="string") {
-    //     // assume image src (get from server)
-    //     img.src = image
-    // } else {
-    //     // TODO can this be deleted? Or maybe used for older letter rendering?
-    //     img = image
-    // }
-
-    if (fixationPoint===undefined) {
-        // race condition?
-        fixationPoint = {x: img.width / 2, y: img.height / 2}
-    }
-
-    store.dispatch(setGraphicsAC([{
-            graphicType: GRAPHIC.IMAGE,
-            image: image,
-            fixationPoint: fixationPoint,
-            scale: scale,
-            lifespan: lifespan,
-            age: 0
-    }]))
-}
-
-export function renderImage(context, image, fixationPoint, scale) {
     // TODO: should change so auto fixate at middle of image?
     // would be breaking and require rewriting protocols
-    const centerX = WIDTH/2
-    const centerY = HEIGHT/2
-    // console.log("renderImage image, fixationPoint:", image, fixationPoint)
-    const deltaX = centerX - fixationPoint.x
-    const deltaY = centerY - fixationPoint.y
-    let X,Y
-    if (typeof(scale)=="number") {
-        X = image.width*scale
-        Y = image.height*scale
+    const centerX = context.canvas.width / 2;
+    const centerY = context.canvas.height / 2;
+    const deltaX = centerX - this.image.fixationPoint.x;
+    const deltaY = centerY - this.image.fixationPoint.y;
+    let x;
+    let y;
+    if (typeof this.image.scale === 'number') {
+      x = this.preloadedImage.width * this.image.scale;
+      y = this.preloadedImage.height * this.image.scale;
     } else {
-        // 2-dim array
-        X = image.width*scale[0]
-        Y = image.height*scale[1]
+      // 2-dim array
+      x = this.preloadedImage.width * this.image.scale[0];
+      y = this.preloadedImage.height * this.image.scale[1];
     }
-    // console.log("renderImage", image)
-    context.drawImage(image, deltaX, deltaY, X, Y)
-}
-*/
+    context.drawImage(this.preloadedImage, deltaX, deltaY, x, y);
 
     context.restore();
     context.fillStyle = 'red';

@@ -1,11 +1,12 @@
+import { ipcRenderer } from 'electron';
+import fs from 'fs';
+import path from 'path';
 import React from 'react';
+import RendererFactory from '../../stimuli/renderers/RendererFactory';
 import Stimulus from '../../stimuli/types/Stimulus';
 import StimulusBaseRenderer from '../../stimuli/renderers/StimulusRenderer';
-import RendererFactory from '../../stimuli/renderers/RendererFactory';
 import VideoInfo from '../../shared/VideoInfo';
 import * as styles from './StimulusRenderer.css';
-
-const ipc = require('electron').ipcRenderer;
 
 type StimulusRendererProps = {
   dummy: string;
@@ -50,18 +51,13 @@ export default class StimulusRenderer extends React.Component<
 > {
   // Set of image paths from the main process that need to be preloaded before the run
   // can start
-  preloadImageSet: Set<string>;
+  preloadImagePaths: Set<string>;
 
-  // Number of images that are preloading, have been preloaded
-  imagesPreloading: number;
+  // Map between the image paths on disk and the corresponding preloaded bitmaps
+  preloadedImages: Map<string, ImageBitmap>;
 
-  imagesPreloaded: number;
-
-  // A flag that indicates when preloading is complete and a map between the image paths
-  // on disk and the corresponding preloaded internal URLs
+  // A flag that indicates when preloading is complete
   preloadComplete: boolean;
-
-  preloadedImages: Record<string, string>;
 
   // Reference to the canvas where the stimuli will be drawn
   canvasRef: React.RefObject<HTMLCanvasElement>;
@@ -77,11 +73,9 @@ export default class StimulusRenderer extends React.Component<
       stimulusQueue: [],
     };
 
-    this.preloadImageSet = new Set();
-    this.imagesPreloading = 0;
-    this.imagesPreloaded = 0;
+    this.preloadImagePaths = new Set();
+    this.preloadedImages = new Map();
     this.preloadComplete = false;
-    this.preloadedImages = {};
 
     this.onAnimationFrame = this.onAnimationFrame.bind(this);
 
@@ -90,14 +84,13 @@ export default class StimulusRenderer extends React.Component<
 
   /*
    * The componentDidMount() function is invoked when the component is mounted in the
-   * DOM and is a good spot to perform class initialization. Retrieve the video
-   * inforation, a list of images that need to be preloaded, and the initial list of
-   * stimuli from the main process and queue an animation request so onAnimationFrame()
-   * will be called before the next frame is rendered.
+   * DOM and is a good spot to perform class initialization. Initialize the program
+   * that we're about to run, fetch the initial list of stimuli from the main process,
+   * and queue an animation request so onAnimationFrame() will be called before the
+   * next frame is rendered.
    */
   componentDidMount() {
-    this.fetchVideoInfo();
-    this.fetchImageSet();
+    this.initializeProgram();
     this.fetchStimulusBatch();
     requestAnimationFrame(this.onAnimationFrame);
   }
@@ -129,7 +122,7 @@ export default class StimulusRenderer extends React.Component<
       this.setState({
         lifecycleStage: LifecycleStage.RUNNING,
       });
-      ipc.send('startStimuli', this.state.frameCount + PRE_FRAME_COUNT);
+      ipcRenderer.send('startStimuli', this.state.frameCount + PRE_FRAME_COUNT);
     }
 
     // Stop here if we're still starting.
@@ -151,7 +144,8 @@ export default class StimulusRenderer extends React.Component<
         );
         currentStimulus = RendererFactory.createRenderer(
           this.state.stimulusQueue[0],
-          this.state.videoInfo
+          this.state.videoInfo,
+          this.preloadedImages
         );
         this.setState((prevState) => ({
           stimulus: currentStimulus,
@@ -162,7 +156,6 @@ export default class StimulusRenderer extends React.Component<
         this.setState({
           stimulus: null,
         });
-        ipc.send('endProgram');
         return;
       }
     }
@@ -191,49 +184,56 @@ export default class StimulusRenderer extends React.Component<
   }
 
   /*
-   * The fetchVideoInfo() function retrieves details regarding the video we're simulating
-   * frames for like dimensions and frames per second.
+   * The initializeProgram() function retrieves details from the main thread regarding
+   * the video we're simulating and preloads all images needed by the program.
    */
-  fetchVideoInfo() {
+  initializeProgram() {
+    // Fetch video info
+    const videoInfo = JSON.parse(
+      ipcRenderer.sendSync('getVideoInfo')
+    ) as VideoInfo;
     this.setState({
-      videoInfo: JSON.parse(ipc.sendSync('getVideoInfo')) as VideoInfo,
+      videoInfo,
     });
-  }
 
-  /*
-   * The fetchImageSet() function retrieves a list of all images associated with this
-   * program so they can be preloaded. It then triggers the preloading process by
-   * calling the function preloadImages().
-   */
-  fetchImageSet() {
-    this.preloadImageSet = ipc.sendSync('getImageSet') as Set<string>;
-    this.preloadImages();
-  }
+    // Fetch the image list from the main process and stop here if there are no images
+    this.preloadImagePaths = ipcRenderer.sendSync('getImageSet') as Set<string>;
+    if (this.preloadImagePaths.size === 0) {
+      this.preloadComplete = true;
+      return;
+    }
 
-  preloadImages() {
-    console.log(
-      `## Preloading image set of size: ${this.preloadImageSet.size}`
-    );
-    // setTimeout(() => {
-    console.log(`## Pretending images have been preloaded`);
-    this.preloadComplete = true;
-    // }, 3000);
-
-    /*
-    //const imageSetStr = [...imageSet].join(',');
-    // Set of image paths from the main process that need to be preloaded before the run
-    // can start
-    imageSet: Set<string>;
-
-    // Map of image paths on disk to URLs internal to the browser
-    images: Record<string, string>;
-
-    // Number of images that are loading, have been loaded, and a flag to indicate loading
-    // is complete
-    imagesLoading = 0;
-    imagesLoaded = 0;
-    preloadComplete = false;
-    */
+    this.preloadImagePaths.forEach((imagePath) => {
+      // Combine any relative paths with the output directory
+      let fullImagePath: string;
+      if (path.isAbsolute(imagePath)) {
+        fullImagePath = imagePath;
+      } else {
+        fullImagePath = path.join(videoInfo.outputDirectory, imagePath);
+      }
+      fs.readFile(fullImagePath, (err, data: Buffer) => {
+        if (err) {
+          ipcRenderer.send(
+            'programFailure',
+            `Failed to open image '${imagePath}': ${err}`
+          );
+        }
+        createImageBitmap(new Blob([data]))
+          .then((image: ImageBitmap) => {
+            this.preloadedImages.set(imagePath, image);
+            if (this.preloadedImages.size === this.preloadImagePaths.size) {
+              this.preloadComplete = true;
+            }
+            return null;
+          })
+          .catch((e) => {
+            ipcRenderer.send(
+              'programFailure',
+              `Failed to parse image '${imagePath}': ${e}`
+            );
+          });
+      });
+    });
   }
 
   /*
@@ -249,7 +249,7 @@ export default class StimulusRenderer extends React.Component<
 
     // Fetch the raw stimuli as strings. The main process will return an empty array when
     // the program is complete
-    const rawStimuli: string[] = ipc.sendSync('getStimulusBatch');
+    const rawStimuli: string[] = ipcRenderer.sendSync('getStimulusBatch');
     if (rawStimuli.length === 0) {
       this.setState({
         lifecycleStage: LifecycleStage.COMPLETE,
