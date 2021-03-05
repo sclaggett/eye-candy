@@ -1,6 +1,6 @@
 {
   "name": "eye-candy-root",
-  "version": "0.3.3",
+  "version": "0.0.1",
   "description": "Eye Candy root project",
   "scripts": {
     "build": "concurrently \"yarn build-main\" \"yarn build-renderer\"",

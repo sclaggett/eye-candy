@@ -123,6 +123,7 @@ export default class Control extends React.Component<
     // Bind the IPC handlers and other callbacks so "this" will be defined when
     // they are invoked
     this.onInputChange = this.onInputChange.bind(this);
+    this.onCheckboxChange = this.onCheckboxChange.bind(this);
     this.onTextAreaChange = this.onTextAreaChange.bind(this);
     this.onStartButtonClick = this.onStartButtonClick.bind(this);
     this.onStopButtonClick = this.onStopButtonClick.bind(this);
@@ -219,6 +220,14 @@ export default class Control extends React.Component<
     if (event.target && event.target.name && event.target.value) {
       this.setState(({
         [event.target.name]: event.target.value,
+      } as unknown) as ControlState);
+    }
+  }
+
+  onCheckboxChange(event: React.ChangeEvent<HTMLInputElement>) {
+    if (event.target && event.target.name) {
+      this.setState(({
+        [event.target.name]: event.target.checked,
       } as unknown) as ControlState);
     }
   }
@@ -627,11 +636,81 @@ export default class Control extends React.Component<
         </div>
 
         <Modal
+          className={styles.modalContent}
+          overlayClassName={styles.modalOverlay}
           isOpen={this.state.settingsOpen}
           onRequestClose={this.onToggleSettingsDialog}
           contentLabel="Settings"
         >
-          <div>My modal dialog.</div>
+          <div className={styles.modalContainer}>
+            <div className={styles.modalRow}>
+              <div className={styles.modalField}>Root directory</div>
+              <div className={styles.value}>
+                <input
+                  className={styles.input}
+                  type="text"
+                  name="rootDirectory"
+                  value={this.state.rootDirectory}
+                  onChange={this.onInputChange}
+                />
+                <input
+                  className={styles.dirSelect}
+                  type="button"
+                  onClick={this.onDirectorySelectClick}
+                />
+              </div>
+            </div>
+            <div className={styles.modalRow}>
+              <div className={styles.modalField}>Ffmpeg location</div>
+              <div className={styles.value}>
+                <input
+                  className={styles.input}
+                  type="text"
+                  name="ffmpegPath"
+                  value={this.state.ffmpegPath}
+                  onChange={this.onInputChange}
+                />
+                <input
+                  className={styles.dirSelect}
+                  type="button"
+                  onClick={this.onFfmpegSelectClick}
+                />
+              </div>
+            </div>
+            <div className={styles.modalRow}>
+              <div className={styles.modalField}>Stamp frames:</div>
+              <div className={styles.value}>
+                <input
+                  type="checkbox"
+                  name="stampFrames"
+                  checked={this.state.stampFrames}
+                  onChange={this.onCheckboxChange}
+                />
+              </div>
+            </div>
+            <div className={styles.modalRow}>
+              <div className={styles.modalField}>Save stimuli</div>
+              <div className={styles.value}>
+                <input
+                  type="checkbox"
+                  name="saveStimuli"
+                  checked={this.state.saveStimuli}
+                  onChange={this.onCheckboxChange}
+                />
+              </div>
+            </div>
+            <div className={styles.modalRow}>
+              <div className={styles.modalField}>Limit duration</div>
+              <input
+                className={styles.input}
+                type="text"
+                name="ffmpegPath"
+                value={this.state.limitSeconds}
+                onChange={this.onInputChange}
+              />
+              sec
+            </div>
+          </div>
         </Modal>
       </div>
     );
