@@ -127,6 +127,8 @@ function runStopped() {
   program = null;
   stimulusQueue = [];
   imageSet.clear();
+  earlyFrameQueue = [];
+  firstFrameNumber = -1;
 
   // Notify the control window
   if (controlWindow && controlWindow.webContents) {
@@ -216,6 +218,12 @@ function frameCaptured(image: nativeImage) {
     // Clear the queue and start the frame cleanup timer
     earlyFrameQueue = [];
     startFrameCleanTimer();
+  }
+
+  // Discard any frames beyond the last one that we expect while waiting for FFmpeg to
+  // process any frames that are queued up
+  if (videoInfo.frameNumber >= videoInfo.frameCount + firstFrameNumber) {
+    return;
   }
 
   // Pass the new image to the native layer, remember the ID that it is assigned,
@@ -448,24 +456,28 @@ function setState(args: StartProgram) {
   videoInfo.fps = args.fps;
   videoInfo.programName = args.programName;
   videoInfo.programText = args.programText;
-  videoInfo.outputDirectory = path.join(
+  const outputDirectory = path.join(
     videoInfo.rootDirectory,
     videoInfo.outputName
   );
   videoInfo.infoPath = path.join(
-    videoInfo.outputDirectory,
+    outputDirectory,
     `${videoInfo.outputName}.epl`
   );
+  videoInfo.stimuliPath = path.join(
+    outputDirectory,
+    `${videoInfo.outputName}.stim`
+  );
   videoInfo.videoPath = path.join(
-    videoInfo.outputDirectory,
+    outputDirectory,
     `${videoInfo.outputName}.mp4`
   );
   videoInfo.programPath = path.join(
-    videoInfo.outputDirectory,
+    outputDirectory,
     `${videoInfo.outputName}.js`
   );
-  if (!fs.existsSync(videoInfo.outputDirectory)) {
-    fs.mkdirSync(videoInfo.outputDirectory, { recursive: true });
+  if (!fs.existsSync(outputDirectory)) {
+    fs.mkdirSync(outputDirectory, { recursive: true });
   }
 }
 function compileProgram() {
@@ -507,14 +519,16 @@ function compileProgram() {
 }
 function generateStimuli() {
   // Generate all stimuli while keeping track of a what images need to be preloaded and
-  // the total duration of the program. Note that this process may need to be broken down
-  // into multiple steps for longer programs to prevent locking up the application for
-  // unacceptable periods of time.
+  // the total duration of the program. Limit the program to a specific number of seconds
+  // for debugging purposes if directed to by the user.
+  //
+  // Note that this process may need to be broken down into multiple steps for longer/
+  // programs to prevent locking up the application for unacceptable periods of time.
   if (!program) {
     throw new Error('Program not defined');
   }
   let durationSecs = 0;
-  while (true && durationSecs < 30) {
+  while (true) {
     const response: ProgramNext = program.next() as ProgramNext;
     if (response.done) {
       break;
@@ -527,6 +541,13 @@ function generateStimuli() {
     stimulusQueue.push(stimulus);
     if (stimulus.stimulusType === 'IMAGE') {
       imageSet.add((stimulus as Image).image);
+    }
+    if (
+      videoInfo !== null &&
+      videoInfo.limitSeconds !== 0 &&
+      durationSecs >= videoInfo.limitSeconds
+    ) {
+      break;
     }
   }
 
@@ -597,7 +618,7 @@ function spawnFFmpeg() {
     videoInfo.width,
     videoInfo.height,
     videoInfo.fps,
-    videoInfo.outputPath
+    videoInfo.videoPath
   );
   if (result !== '') {
     log(`Error: ${result}\n`);

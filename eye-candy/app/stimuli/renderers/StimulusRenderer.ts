@@ -21,6 +21,39 @@ export default class StimulusRenderer {
     return this.frameNumber < this.frameCount;
   }
 
+  canSkipRendering(context: CanvasRenderingContext2D) {
+    // We can't skip rendering the first frame or any frames at all if we're stamping them
+    // with debugging info
+    if (this.frameNumber === 0 || this.videoInfo.stampFrames) {
+      return false;
+    }
+
+    // We need a way to convince the system that something has changed or we won't get the
+    // frame from the offscreen renderer. The following approach works but there may be
+    // a more efficient way to get the same result.
+    const imageData = context.getImageData(
+      0,
+      0,
+      context.canvas.width,
+      context.canvas.height
+    );
+    context.putImageData(imageData, 0, 0, 0, 0, 1, 1);
+    return true;
+  }
+
+  stampFrame(context: CanvasRenderingContext2D) {
+    if (!this.videoInfo.stampFrames) {
+      return;
+    }
+    context.fillStyle = 'red';
+    context.font = '16px Arial';
+    context.fillText(
+      `${this.stimulus.stimulusType} ${this.frameNumber}`,
+      50,
+      50
+    );
+  }
+
   colorToRGB(colorName: string) {
     const canvas: HTMLCanvasElement = document.createElement('canvas');
     const context: CanvasRenderingContext2D | null = canvas.getContext('2d');

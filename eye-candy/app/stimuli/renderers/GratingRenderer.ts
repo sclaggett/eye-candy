@@ -67,9 +67,7 @@ export default class GratingRenderer extends StimulusRenderer {
     );
 
     context.restore();
-    context.fillStyle = 'red';
-    context.font = '16px Arial';
-    context.fillText(`Grating ${this.frameNumber}`, 50, 50);
+    this.stampFrame(context);
     this.frameNumber += 1;
   }
 }

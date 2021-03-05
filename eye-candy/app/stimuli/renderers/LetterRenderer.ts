@@ -17,6 +17,12 @@ export default class LetterRenderer extends StimulusRenderer {
   }
 
   render(context: CanvasRenderingContext2D) {
+    // This stimulus doesn't change after the first frame so skip all render calls except the first
+    if (this.canSkipRendering(context)) {
+      this.frameNumber += 1;
+      return;
+    }
+
     context.save();
     this.renderBackground(context);
 
@@ -25,9 +31,7 @@ export default class LetterRenderer extends StimulusRenderer {
     context.fillText(this.letter.letter, this.letter.x, this.letter.y);
 
     context.restore();
-    context.fillStyle = 'red';
-    context.font = '16px Arial';
-    context.fillText(`Letter ${this.frameNumber}`, 50, 50);
+    this.stampFrame(context);
     this.frameNumber += 1;
   }
 }

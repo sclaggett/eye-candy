@@ -50,9 +50,7 @@ export default class ChirpRenderer extends StimulusRenderer {
     context.fillRect(0, 0, context.canvas.width, context.canvas.height);
 
     context.restore();
-    context.fillStyle = 'red';
-    context.font = '16px Arial';
-    context.fillText(`Chirp ${this.frameNumber}`, 50, 50);
+    this.stampFrame(context);
     this.frameNumber += 1;
   }
 }

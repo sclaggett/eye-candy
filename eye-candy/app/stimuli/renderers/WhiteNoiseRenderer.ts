@@ -56,9 +56,7 @@ export default class WhiteNoiseRenderer extends StimulusRenderer {
     );
 
     context.restore();
-    context.fillStyle = 'red';
-    context.font = '16px Arial';
-    context.fillText(`WhiteNoise ${this.frameNumber}`, 50, 50);
+    this.stampFrame(context);
     this.frameNumber += 1;
   }
 

@@ -17,6 +17,12 @@ export default class CheckerboardRenderer extends StimulusRenderer {
   }
 
   render(context: CanvasRenderingContext2D) {
+    // This stimulus doesn't change after the first frame so skip all render calls except the first
+    if (this.canSkipRendering(context)) {
+      this.frameNumber += 1;
+      return;
+    }
+
     context.save();
     this.renderBackground(context);
 
@@ -71,9 +77,7 @@ export default class CheckerboardRenderer extends StimulusRenderer {
     }
 
     context.restore();
-    context.fillStyle = 'red';
-    context.font = '16px Arial';
-    context.fillText(`Checkerboard ${this.frameNumber}`, 50, 50);
+    this.stampFrame(context);
     this.frameNumber += 1;
   }
 }

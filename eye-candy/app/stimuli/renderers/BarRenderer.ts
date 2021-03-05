@@ -46,9 +46,7 @@ export default class BarRenderer extends StimulusRenderer {
     );
 
     context.restore();
-    context.fillStyle = 'red';
-    context.font = '16px Arial';
-    context.fillText(`Bar ${this.frameNumber}`, 50, 50);
+    this.stampFrame(context);
     this.frameNumber += 1;
   }
 }

@@ -34,7 +34,7 @@ export default class StartProgram {
     this.seed = 0;
     this.stampFrames = false;
     this.saveStimuli = false;
-    this.limitSeconds = false;
+    this.limitSeconds = 0;
     this.width = 0;
     this.height = 0;
     this.fps = 0;

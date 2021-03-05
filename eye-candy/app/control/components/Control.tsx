@@ -10,8 +10,13 @@ import * as styles from './Control.css';
 // process until the main process notifies us of the module root
 const eyeNative = require('eye-native');
 
-// Give the modal library the name of this app's root div
-Modal.setAppElement('#controlRoot');
+// Give the modal library the name of this app's root div. Check first to make sure that
+// we're executing in the control window because for some reason this code appears to also
+// be run in the stimulus window for reasons that aren't clear to me.
+const rootDiv = document.getElementById('controlRoot');
+if (rootDiv) {
+  Modal.setAppElement('#controlRoot');
+}
 
 type ControlProps = {
   dummy: string;
@@ -89,8 +94,8 @@ export default class Control extends React.Component<
       ffmpegPath: initFfmpegPath,
       seed: 108,
       stampFrames: false,
-      saveStimuli: false,
-      limitSeconds: 0,
+      saveStimuli: true,
+      limitSeconds: 60,
       width: 1024,
       height: 720,
       fps: 30,
@@ -117,11 +122,19 @@ export default class Control extends React.Component<
 
     // Bind the IPC handlers and other callbacks so "this" will be defined when
     // they are invoked
+    this.onInputChange = this.onInputChange.bind(this);
+    this.onTextAreaChange = this.onTextAreaChange.bind(this);
+    this.onStartButtonClick = this.onStartButtonClick.bind(this);
+    this.onStopButtonClick = this.onStopButtonClick.bind(this);
     this.onLog = this.onLog.bind(this);
     this.onRunPreviewChannel = this.onRunPreviewChannel.bind(this);
     this.onPreviewInterval = this.onPreviewInterval.bind(this);
+    this.onProgramSelected = this.onProgramSelected.bind(this);
     this.onRunProgress = this.onRunProgress.bind(this);
     this.onRunStopped = this.onRunStopped.bind(this);
+    this.onDirectorySelectClick = this.onDirectorySelectClick.bind(this);
+    this.onFfmpegSelectClick = this.onFfmpegSelectClick.bind(this);
+    this.onToggleSettingsDialog = this.onToggleSettingsDialog.bind(this);
 
     // Listen for IPC calls
     ipcRenderer.on('log', this.onLog);
@@ -160,18 +173,21 @@ export default class Control extends React.Component<
       .invoke('getProgramsDirectory')
       .then((programDir) => {
         this.programDirectory = programDir;
-        fs.readdir(this.programDirectory, (err: Error, dir: string[]) => {
-          if (err) {
-            throw new Error(`Failed to read programs directory: ${err}`);
+        fs.readdir(
+          this.programDirectory,
+          (err: ErrnoException | null, files: string[]) => {
+            if (err) {
+              throw new Error(`Failed to read programs directory: ${err}`);
+            }
+            const programNames: string[] = [];
+            for (let i = 0; i < files.length; i += 1) {
+              programNames.push(files[i]);
+            }
+            this.setState((prevState) => ({
+              programNames: prevState.programNames.concat(programNames),
+            }));
           }
-          const programNames: string[] = [];
-          for (let i = 0; i < dir.length; i += 1) {
-            programNames.push(dir[i]);
-          }
-          this.setState((prevState) => ({
-            programNames: prevState.programNames.concat(programNames),
-          }));
-        });
+        );
         return null;
       })
       .catch(() => {
@@ -199,7 +215,6 @@ export default class Control extends React.Component<
    * Define generic input and textarea handlers that work by virtue of the fact that the
    * input element names match state field names.
    */
-
   onInputChange(event: React.ChangeEvent<HTMLInputElement>) {
     if (event.target && event.target.name && event.target.value) {
       this.setState(({
@@ -243,6 +258,8 @@ export default class Control extends React.Component<
     // Set the state to running so the UI will lock until the main process releases it
     this.setState(({
       running: true,
+      progress: 0,
+      imageUrl: '',
     } as unknown) as ControlState);
   }
 
@@ -355,7 +372,7 @@ export default class Control extends React.Component<
     // Load the program from the file system
     fs.readFile(
       path.join(this.programDirectory, programName),
-      (err: Error, data: string) => {
+      (err: ErrnoException | null, data: Buffer) => {
         // Make sure the file was loaded successfully
         if (err) {
           throw err;
@@ -363,7 +380,7 @@ export default class Control extends React.Component<
 
         // Set the program text
         this.setState(({
-          programText: data,
+          programText: data.toString(),
         } as unknown) as ControlState);
       }
     );
@@ -436,10 +453,10 @@ export default class Control extends React.Component<
   }
 
   /*
-   * The toggleSettings() callback is invoked to toggle the settings model dialog
+   * The onToggleSettingsDialog() callback is invoked to toggle the settings model dialog
    * open and close.
    */
-  toggleSettings() {
+  onToggleSettingsDialog() {
     console.log('## Toggle settings');
     this.setState((prevState) => ({
       settingsOpen: !prevState.settingsOpen,
@@ -481,7 +498,7 @@ export default class Control extends React.Component<
                   name="outputName"
                   value={this.state.outputName}
                   disabled={this.state.running}
-                  onChange={this.onInputChange.bind(this)}
+                  onChange={this.onInputChange}
                 />
               </div>
             </div>
@@ -494,7 +511,7 @@ export default class Control extends React.Component<
                   name="width"
                   value={this.state.width}
                   disabled={this.state.running}
-                  onChange={this.onInputChange.bind(this)}
+                  onChange={this.onInputChange}
                 />
                 <div className={styles.videoFormatText}>x</div>
                 <input
@@ -503,7 +520,7 @@ export default class Control extends React.Component<
                   name="height"
                   value={this.state.height}
                   disabled={this.state.running}
-                  onChange={this.onInputChange.bind(this)}
+                  onChange={this.onInputChange}
                 />
                 <div className={styles.videoFormatText}>@</div>
                 <input
@@ -512,34 +529,41 @@ export default class Control extends React.Component<
                   name="fps"
                   value={this.state.fps}
                   disabled={this.state.running}
-                  onChange={this.onInputChange.bind(this)}
+                  onChange={this.onInputChange}
                 />
                 <div className={styles.videoFormatText}>fps</div>
               </div>
             </div>
             <div className={styles.row}>
               <div className={styles.buttons}>
+                <div className={styles.buttonPadding} />
                 <input
                   className={styles.button}
                   type="button"
                   value="Compile"
                   disabled={notReadyToRun || this.state.running}
-                  onClick={this.onStartButtonClick.bind(this)}
+                  onClick={this.onStartButtonClick}
                 />
                 <input
                   className={styles.button}
                   type="button"
                   value="Run"
                   disabled={notReadyToRun || this.state.running}
-                  onClick={this.onStartButtonClick.bind(this)}
+                  onClick={this.onStartButtonClick}
                 />
                 <input
                   className={styles.button}
                   type="button"
                   value="Stop"
                   disabled={notReadyToRun || !this.state.running}
-                  onClick={this.onStopButtonClick.bind(this)}
+                  onClick={this.onStopButtonClick}
                 />
+                <div
+                  className={styles.progress}
+                  style={this.state.running ? {} : { visibility: 'hidden' }}
+                >
+                  {`${this.state.progress.toString()}%`}
+                </div>
               </div>
             </div>
             <div className={styles.log}>
@@ -549,7 +573,7 @@ export default class Control extends React.Component<
                 name="programText"
                 value={this.state.log}
                 readOnly
-                onChange={this.onTextAreaChange.bind(this)}
+                onChange={this.onTextAreaChange}
               />
             </div>
             <div className={styles.previewOuter} ref={this.previewContainer}>
@@ -564,12 +588,6 @@ export default class Control extends React.Component<
                   alt=""
                 />
               </div>
-              <div
-                className={styles.progress}
-                style={this.state.running ? {} : { visibility: 'hidden' }}
-              >
-                {`${this.state.progress.toString()}%`}
-              </div>
             </div>
           </div>
           <div className={styles.columnRight}>
@@ -580,7 +598,7 @@ export default class Control extends React.Component<
                   name="programName"
                   value={this.state.programName}
                   disabled={this.state.running}
-                  onChange={this.onProgramSelected.bind(this)}
+                  onChange={this.onProgramSelected}
                 >
                   {this.state.programNames.map((program) => (
                     <option key={program} value={program}>
@@ -592,7 +610,7 @@ export default class Control extends React.Component<
                   className={styles.settings}
                   type="button"
                   disabled={this.state.running}
-                  onClick={this.toggleSettings.bind(this)}
+                  onClick={this.onToggleSettingsDialog}
                 />
               </div>
             </div>
@@ -602,7 +620,7 @@ export default class Control extends React.Component<
                 name="programText"
                 value={this.state.programText}
                 disabled={this.state.running}
-                onChange={this.onTextAreaChange.bind(this)}
+                onChange={this.onTextAreaChange}
               />
             </div>
           </div>
@@ -610,7 +628,7 @@ export default class Control extends React.Component<
 
         <Modal
           isOpen={this.state.settingsOpen}
-          onRequestClose={this.toggleSettings}
+          onRequestClose={this.onToggleSettingsDialog}
           contentLabel="Settings"
         >
           <div>My modal dialog.</div>

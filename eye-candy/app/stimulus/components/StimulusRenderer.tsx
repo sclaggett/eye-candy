@@ -209,7 +209,7 @@ export default class StimulusRenderer extends React.Component<
       if (path.isAbsolute(imagePath)) {
         fullImagePath = imagePath;
       } else {
-        fullImagePath = path.join(videoInfo.outputDirectory, imagePath);
+        fullImagePath = path.join(videoInfo.rootDirectory, imagePath);
       }
       fs.readFile(fullImagePath, (err, data: Buffer) => {
         if (err) {
