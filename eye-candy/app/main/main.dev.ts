@@ -143,7 +143,7 @@ function runStopped() {
  * frames have been submitted for processing and purge completed frame from the list at
  * 10 ms intervals.
  */
-const pendingFrames: { [index: string]: any } = {};
+const pendingFrames: { [index: string]: nativeImage } = {};
 let frameCleanTimer: ReturnType<typeof setInterval> | null = null;
 function startFrameCleanTimer() {
   if (frameCleanTimer !== null) {
