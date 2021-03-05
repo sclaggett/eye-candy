@@ -373,16 +373,14 @@ ipcMain.handle('getProgramsDirectory', async (_event: Event) => {
 });
 
 /**
- * The "selectOutputDirectory" IPC function will be called by the control window when
- * the user wants to select the output directory. The currently selected directory or
+ * The "selectRootDirectory" IPC function will be called by the control window when
+ * the user wants to select the root directory. The currently selected directory or
  * an empty string will be passed as the parameter.
  */
-ipcMain.on('selectOutputDirectory', (event, initialDirectory: string) => {
+ipcMain.on('selectRootDirectory', (event, initialDirectory: string) => {
   // Open a modal directory selection dialog
   if (controlWindow === null) {
-    throw new Error(
-      'Cannot select output directory when control window is null'
-    );
+    throw new Error('Cannot select root directory when control window is null');
   }
   const result: string[] | undefined = dialog.showOpenDialogSync(
     controlWindow,
@@ -438,18 +436,33 @@ ipcMain.on('selectFfmpegPath', (event, initialPath: string) => {
 function setState(args: StartProgram) {
   // Copy the arguments to the video info
   videoInfo = new VideoInfo();
-  videoInfo.outputDirectory = args.outputDirectory;
-  videoInfo.rootFileName = args.rootFileName;
-  videoInfo.programName = args.programName;
-  videoInfo.programText = args.programText;
+  videoInfo.rootDirectory = args.rootDirectory;
+  videoInfo.outputName = args.outputName;
+  videoInfo.ffmpegPath = args.ffmpegPath;
   videoInfo.seed = args.seed;
+  videoInfo.stampFrames = args.stampFrames;
+  videoInfo.saveStimuli = args.saveStimuli;
+  videoInfo.limitSeconds = args.limitSeconds;
   videoInfo.width = args.width;
   videoInfo.height = args.height;
-  videoInfo.ffmpegPath = args.ffmpegPath;
   videoInfo.fps = args.fps;
-  videoInfo.outputPath = path.join(
+  videoInfo.programName = args.programName;
+  videoInfo.programText = args.programText;
+  videoInfo.outputDirectory = path.join(
+    videoInfo.rootDirectory,
+    videoInfo.outputName
+  );
+  videoInfo.infoPath = path.join(
     videoInfo.outputDirectory,
-    `${videoInfo.rootFileName}.mp4`
+    `${videoInfo.outputName}.epl`
+  );
+  videoInfo.videoPath = path.join(
+    videoInfo.outputDirectory,
+    `${videoInfo.outputName}.mp4`
+  );
+  videoInfo.programPath = path.join(
+    videoInfo.outputDirectory,
+    `${videoInfo.outputName}.js`
   );
   if (!fs.existsSync(videoInfo.outputDirectory)) {
     fs.mkdirSync(videoInfo.outputDirectory, { recursive: true });

@@ -1,39 +1,62 @@
-import React from 'react';
-import { IpcRendererEvent } from 'electron';
+import { ipcRenderer, IpcRendererEvent, nativeImage } from 'electron';
+import fs from 'fs';
+import Modal from 'react-modal';
 import path from 'path';
-import * as styles from './Control.css';
+import React from 'react';
 import StartProgram from '../../shared/StartProgram';
-
-const { ipcRenderer, nativeImage } = require('electron');
-const fs = require('fs');
+import * as styles from './Control.css';
 
 // Require the eye-native library but remember that we can't use it in a renderer
 // process until the main process notifies us of the module root
 const eyeNative = require('eye-native');
+
+// Give the modal library the name of this app's root div
+Modal.setAppElement('#controlRoot');
 
 type ControlProps = {
   dummy: string;
 };
 
 type ControlState = {
-  outputDirectory: string;
-  rootFileName: string;
+  // These fields are initialized from the user settings and can be changed
+  // using the settings dialog
+  rootDirectory: string;
+  outputName: string;
+  ffmpegPath: string;
+  seed: number;
+  stampFrames: boolean;
+  saveStimuli: boolean;
+  limitSeconds: number;
+
+  // These fields are initialized from the user settings and can be changed
+  // on this control page
   width: number;
   height: number;
   fps: number;
-  ffmpegPath: string;
-  seed: number;
+
+  // List of program names for the dropdown, the name of the selected program,
+  // a flag indicating if it has unsaved changes, and its text
+  programNames: string[];
+  programName: string;
+  programDirty: boolean;
+  programText: string;
+
+  // Log messages
   log: string;
+
+  // Flag that indicates if we're running and the percent complete
   running: boolean;
   progress: number;
+
+  // Preview image URL and position
   imageUrl: string;
   imageTop: number;
   imageLeft: number;
   imageWidth: number;
   imageHeight: number;
-  programNames: string[];
-  selectedProgramName: string;
-  programText: string;
+
+  // Flag indicating if the settings dialog is open
+  settingsOpen: boolean;
 };
 
 export default class Control extends React.Component<
@@ -61,13 +84,20 @@ export default class Control extends React.Component<
 
     // Define the initial state
     this.state = {
-      outputDirectory: '',
-      rootFileName: 'test',
+      rootDirectory: '',
+      outputName: 'test',
+      ffmpegPath: initFfmpegPath,
+      seed: 108,
+      stampFrames: false,
+      saveStimuli: false,
+      limitSeconds: 0,
       width: 1024,
       height: 720,
       fps: 30,
-      ffmpegPath: initFfmpegPath,
-      seed: 108,
+      programNames: ['Untitled'],
+      programName: 'Untitled',
+      programDirty: false,
+      programText: '',
       log: '',
       running: false,
       progress: 0,
@@ -76,9 +106,7 @@ export default class Control extends React.Component<
       imageLeft: 0,
       imageWidth: 0,
       imageHeight: 0,
-      programNames: ['New'],
-      selectedProgramName: 'New',
-      programText: '',
+      settingsOpen: false,
     };
 
     // Initialize variables
@@ -113,14 +141,14 @@ export default class Control extends React.Component<
     ipcRenderer
       .invoke('getHomeDirectory')
       .then((homeDirectory) => {
-        let initOutputDirectory;
+        let initRootDirectory;
         if (process.platform === 'win32') {
-          initOutputDirectory = `${homeDirectory}\\Desktop\\EyeCandyData`;
+          initRootDirectory = `${homeDirectory}\\Desktop\\EyeCandyData`;
         } else {
-          initOutputDirectory = `${homeDirectory}/Desktop/EyeCandyData`;
+          initRootDirectory = `${homeDirectory}/Desktop/EyeCandyData`;
         }
         this.setState({
-          outputDirectory: initOutputDirectory,
+          rootDirectory: initRootDirectory,
         });
         return null;
       })
@@ -189,38 +217,6 @@ export default class Control extends React.Component<
   }
 
   /*
-   * The onDirectorySelectClick() callback is invoked when the user wants to select
-   * the output directory. Pass the event to the main process using IPC.
-   */
-  onDirectorySelectClick() {
-    const selectedDirectory: string | null = ipcRenderer.sendSync(
-      'selectOutputDirectory',
-      this.state.outputDirectory
-    );
-    if (selectedDirectory !== null) {
-      this.setState({
-        outputDirectory: selectedDirectory,
-      });
-    }
-  }
-
-  /*
-   * In a similar fashion, the onFfmpegSelectClick() callback is invoked when the user
-   * wants to select the ffmpeg executable. Pass the event to the main process using IPC.
-   */
-  onFfmpegSelectClick() {
-    const selectedFfmpeg: string | null = ipcRenderer.sendSync(
-      'selectFfmpegPath',
-      this.state.ffmpegPath
-    );
-    if (selectedFfmpeg !== null) {
-      this.setState({
-        ffmpegPath: selectedFfmpeg,
-      });
-    }
-  }
-
-  /*
    * The following two functions will be invoked when the user clicks the Compile/Start
    * buttons or the Stop button. In both cases, the signals will be passed to the main
    * process.
@@ -228,15 +224,18 @@ export default class Control extends React.Component<
   onStartButtonClick(event: React.MouseEvent<HTMLInputElement, MouseEvent>) {
     // Create an instance of the StartProgram arguments
     const args: StartProgram = new StartProgram();
-    args.outputDirectory = this.state.outputDirectory;
-    args.rootFileName = this.state.rootFileName;
-    args.programName = this.state.selectedProgramName;
-    args.programText = this.state.programText.toString();
+    args.rootDirectory = this.state.rootDirectory;
+    args.outputName = this.state.outputName;
+    args.ffmpegPath = this.state.ffmpegPath;
     args.seed = this.state.seed;
+    args.stampFrames = this.state.stampFrames;
+    args.saveStimuli = this.state.saveStimuli;
+    args.limitSeconds = this.state.limitSeconds;
     args.width = this.state.width;
     args.height = this.state.height;
-    args.ffmpegPath = this.state.ffmpegPath;
     args.fps = this.state.fps;
+    args.programName = this.state.programName;
+    args.programText = this.state.programText.toString();
     args.compileOnly =
       event.target && (event.target as HTMLInputElement).value === 'Compile';
     ipcRenderer.send('startProgram', JSON.stringify(args));
@@ -342,7 +341,7 @@ export default class Control extends React.Component<
 
     // Update the state
     this.setState(({
-      selectedProgramName: programName,
+      programName,
     } as unknown) as ControlState);
 
     // Clear the program if "New" was selected
@@ -405,14 +404,57 @@ export default class Control extends React.Component<
   }
 
   /*
+   * The onDirectorySelectClick() callback is invoked when the user wants to select
+   * the root directory. Pass the event to the main process using IPC.
+   */
+  onDirectorySelectClick() {
+    const selectedDirectory: string | null = ipcRenderer.sendSync(
+      'selectRootDirectory',
+      this.state.rootDirectory
+    );
+    if (selectedDirectory !== null) {
+      this.setState({
+        rootDirectory: selectedDirectory,
+      });
+    }
+  }
+
+  /*
+   * In a similar fashion, the onFfmpegSelectClick() callback is invoked when the user
+   * wants to select the ffmpeg executable. Pass the event to the main process using IPC.
+   */
+  onFfmpegSelectClick() {
+    const selectedFfmpeg: string | null = ipcRenderer.sendSync(
+      'selectFfmpegPath',
+      this.state.ffmpegPath
+    );
+    if (selectedFfmpeg !== null) {
+      this.setState({
+        ffmpegPath: selectedFfmpeg,
+      });
+    }
+  }
+
+  /*
+   * The toggleSettings() callback is invoked to toggle the settings model dialog
+   * open and close.
+   */
+  toggleSettings() {
+    console.log('## Toggle settings');
+    this.setState((prevState) => ({
+      settingsOpen: !prevState.settingsOpen,
+    }));
+  }
+
+  /*
    * The render() function converts the state into a JSX description of the interface
    * that should be displayed and the framework will update the output as necessary.
    */
   render() {
     // Check if we're not ready to start running.
     const notReadyToRun: boolean =
-      this.state.outputDirectory.length === 0 ||
-      this.state.rootFileName.length === 0 ||
+      this.state.rootDirectory.length === 0 ||
+      this.state.outputName.length === 0 ||
       this.state.programText.length === 0 ||
       this.state.width === 0 ||
       this.state.height === 0 ||
@@ -424,71 +466,27 @@ export default class Control extends React.Component<
       height: `${this.state.imageHeight}px`,
     };
 
+    console.log(`## Set dirty: ${this.state.programDirty}`);
+
     return (
       <div className={styles.container}>
-        <div className={styles.logo}>
-          <img
-            src="../../resources/EC_Logo_DS_black_backg.png"
-            id="logo"
-            alt=""
-          />
-          <h1>Eye Candy</h1>
-        </div>
         <div className={styles.columns}>
           <div className={styles.columnLeft}>
             <div className={styles.row}>
-              <div className={styles.field}>Output directory:</div>
+              <div className={styles.field}>Name</div>
               <div className={styles.value}>
                 <input
                   className={styles.input}
                   type="text"
-                  name="outputDirectory"
-                  value={this.state.outputDirectory}
-                  disabled={this.state.running}
-                  onChange={this.onInputChange.bind(this)}
-                />
-                <input
-                  className={styles.dirSelect}
-                  type="button"
-                  disabled={this.state.running}
-                  onClick={this.onDirectorySelectClick.bind(this)}
-                />
-              </div>
-            </div>
-            <div className={styles.row}>
-              <div className={styles.field}>Ffmpeg path:</div>
-              <div className={styles.value}>
-                <input
-                  className={styles.input}
-                  type="text"
-                  name="ffmpegPath"
-                  value={this.state.ffmpegPath}
-                  disabled={this.state.running}
-                  onChange={this.onInputChange.bind(this)}
-                />
-                <input
-                  className={styles.dirSelect}
-                  type="button"
-                  disabled={this.state.running}
-                  onClick={this.onFfmpegSelectClick.bind(this)}
-                />
-              </div>
-            </div>
-            <div className={styles.row}>
-              <div className={styles.field}>Root file name:</div>
-              <div className={styles.value}>
-                <input
-                  className={styles.input}
-                  type="text"
-                  name="rootFileName"
-                  value={this.state.rootFileName}
+                  name="outputName"
+                  value={this.state.outputName}
                   disabled={this.state.running}
                   onChange={this.onInputChange.bind(this)}
                 />
               </div>
             </div>
             <div className={styles.row}>
-              <div className={styles.field}>Video format:</div>
+              <div className={styles.field}>Format</div>
               <div className={styles.value}>
                 <input
                   className={styles.inputNarrow}
@@ -517,20 +515,6 @@ export default class Control extends React.Component<
                   onChange={this.onInputChange.bind(this)}
                 />
                 <div className={styles.videoFormatText}>fps</div>
-                [x]
-              </div>
-            </div>
-            <div className={styles.row}>
-              <div className={styles.field}>Randomizer seed:</div>
-              <div className={styles.value}>
-                <input
-                  className={styles.inputNarrow}
-                  type="text"
-                  name="seed"
-                  value={this.state.seed}
-                  disabled={this.state.running}
-                  onChange={this.onInputChange.bind(this)}
-                />
               </div>
             </div>
             <div className={styles.row}>
@@ -590,12 +574,11 @@ export default class Control extends React.Component<
           </div>
           <div className={styles.columnRight}>
             <div className={styles.row}>
-              <div className={styles.field}>Program:</div>
               <div className={styles.programNames}>
                 <select
                   className={styles.input}
-                  name="selectedProgramName"
-                  value={this.state.selectedProgramName}
+                  name="programName"
+                  value={this.state.programName}
                   disabled={this.state.running}
                   onChange={this.onProgramSelected.bind(this)}
                 >
@@ -605,6 +588,12 @@ export default class Control extends React.Component<
                     </option>
                   ))}
                 </select>
+                <input
+                  className={styles.settings}
+                  type="button"
+                  disabled={this.state.running}
+                  onClick={this.toggleSettings.bind(this)}
+                />
               </div>
             </div>
             <div className={styles.programText}>
@@ -618,6 +607,14 @@ export default class Control extends React.Component<
             </div>
           </div>
         </div>
+
+        <Modal
+          isOpen={this.state.settingsOpen}
+          onRequestClose={this.toggleSettings}
+          contentLabel="Settings"
+        >
+          <div>My modal dialog.</div>
+        </Modal>
       </div>
     );
   }

@@ -1,36 +1,45 @@
 /* eslint @typescript-eslint/no-explicit-any: 0 */
 
 export default class StartProgram {
-  outputDirectory: string;
+  rootDirectory: string;
 
-  rootFileName: string;
+  outputName: string;
 
-  programName: string;
-
-  programText: string;
+  ffmpegPath: string;
 
   seed: number;
+
+  stampFrames: boolean;
+
+  saveStimuli: boolean;
+
+  limitSeconds: number;
 
   width: number;
 
   height: number;
 
-  ffmpegPath: string;
-
   fps: number;
+
+  programName: string;
+
+  programText: string;
 
   compileOnly: boolean;
 
   constructor() {
-    this.outputDirectory = '';
-    this.rootFileName = '';
-    this.programName = '';
-    this.programText = '';
+    this.rootDirectory = '';
+    this.outputName = '';
+    this.ffmpegPath = '';
     this.seed = 0;
+    this.stampFrames = false;
+    this.saveStimuli = false;
+    this.limitSeconds = false;
     this.width = 0;
     this.height = 0;
-    this.ffmpegPath = '';
     this.fps = 0;
+    this.programName = '';
+    this.programText = '';
     this.compileOnly = false;
   }
 }
