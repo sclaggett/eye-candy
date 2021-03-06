@@ -19,7 +19,12 @@ jobs:
         with:
           node-version: 14
 
-      - name: yarn install
+      - name: yarn install eye-native
+        run: |
+          yarn install --frozen-lockfile
+        working-directory: ./eye-native
+
+      - name: yarn install eye-candy
         run: |
           yarn install --frozen-lockfile
         working-directory: ./eye-candy
