@@ -704,7 +704,7 @@ export default class Control extends React.Component<
               <input
                 className={styles.input}
                 type="text"
-                name="ffmpegPath"
+                name="limitSeconds"
                 value={this.state.limitSeconds}
                 onChange={this.onInputChange}
               />

@@ -48,7 +48,7 @@
         'libraries': [
           "-lopencv_core",
           "-lopencv_features2d",
-          "-lopencv_highgui",
+          "-lopencv_flann",
           "-lopencv_imgcodecs",
           "-lopencv_imgproc"
         ],
@@ -56,19 +56,19 @@
           {
             'destination': './build/Release',
             'files':[
-              'opencv/mac/lib/libopencv_core.4.5.1.dylib',
+              'opencv/mac/lib/libopencv_core.4.5.2.dylib',
               'opencv/mac/lib/libopencv_core.4.5.dylib',
               'opencv/mac/lib/libopencv_core.dylib',
-              'opencv/mac/lib/libopencv_features2d.4.5.1.dylib',
+              'opencv/mac/lib/libopencv_features2d.4.5.2.dylib',
               'opencv/mac/lib/libopencv_features2d.4.5.dylib',
               'opencv/mac/lib/libopencv_features2d.dylib',
-              'opencv/mac/lib/libopencv_highgui.4.5.1.dylib',
-              'opencv/mac/lib/libopencv_highgui.4.5.dylib',
-              'opencv/mac/lib/libopencv_highgui.dylib',
-              'opencv/mac/lib/libopencv_imgcodecs.4.5.1.dylib',
+              'opencv/mac/lib/libopencv_flann.4.5.2.dylib',
+              'opencv/mac/lib/libopencv_flann.4.5.dylib',
+              'opencv/mac/lib/libopencv_flann.dylib',
+              'opencv/mac/lib/libopencv_imgcodecs.4.5.2.dylib',
               'opencv/mac/lib/libopencv_imgcodecs.4.5.dylib',
               'opencv/mac/lib/libopencv_imgcodecs.dylib',
-              'opencv/mac/lib/libopencv_imgproc.4.5.1.dylib',
+              'opencv/mac/lib/libopencv_imgproc.4.5.2.dylib',
               'opencv/mac/lib/libopencv_imgproc.4.5.dylib',
               'opencv/mac/lib/libopencv_imgproc.dylib'
             ]

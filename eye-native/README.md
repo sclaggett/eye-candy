@@ -36,7 +36,7 @@ $ make install
 $ rm -rf [$/opencv/mac/lib/*]
 $ cp install/lib/libopencv_core*.dylib [$/opencv/mac/lib/]
 $ cp install/lib/libopencv_features2d*.dylib [$/opencv/mac/lib/]
-$ cp install/lib/libopencv_highgui*.dylib [$/opencv/mac/lib/]
+$ cp install/lib/libopencv_flann*.dylib [$/opencv/mac/lib/]
 $ cp install/lib/libopencv_imgcodecs*.dylib [$/opencv/mac/lib/]
 $ cp install/lib/libopencv_imgproc*.dylib [$/opencv/mac/lib/]
 $ rm -rf [$/opencv/mac/include/*]

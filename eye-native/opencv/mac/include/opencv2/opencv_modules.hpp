@@ -10,6 +10,7 @@
 // For example, patented algorithms for non-profit/non-commercial use only.
 /* #undef OPENCV_ENABLE_NONFREE */
 
+#define HAVE_OPENCV_ALPHAMAT
 #define HAVE_OPENCV_ARUCO
 #define HAVE_OPENCV_BGSEGM
 #define HAVE_OPENCV_BIOINSPIRED
@@ -46,6 +47,7 @@
 #define HAVE_OPENCV_REG
 #define HAVE_OPENCV_RGBD
 #define HAVE_OPENCV_SALIENCY
+#define HAVE_OPENCV_SFM
 #define HAVE_OPENCV_SHAPE
 #define HAVE_OPENCV_STEREO
 #define HAVE_OPENCV_STITCHING
