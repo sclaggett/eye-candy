@@ -143,7 +143,7 @@ Napi::Value wrapper::getNextFrame(const Napi::CallbackInfo& info)
   {
     Napi::TypeError::New(env, "Failed to create buffer").ThrowAsJavaScriptException();
     return env.Null();
-  }  
+  }
   napi_value output_array;
   status = napi_create_typedarray(env, napi_uint8_array, length, output_buffer, 0,
     &output_array);
