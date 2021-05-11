@@ -1,5 +1,9 @@
 # Eye Candy
 
+- [eye-native](eye-native/README.md)
+- [eye-candy](eye-candy/README.md)
+- [eye-projector](eye-projector/README.md)
+
 ## EyeCandy program flow
 
 **Step 1.** The main electron process creates the control window which allows the user to select an existing EyeCandy program or create a new one.
