@@ -9,36 +9,19 @@
   flex-direction: column;
 }
 
-.columns {
-  display: flex;
-  flex-direction: row;
-  height: 100%;
-}
-
-.columnLeft {
-  flex: 2;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.columnRight {
-  flex: 3;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.section {
-  padding-bottom: 10px;
-}
-
 .row {
   display: flex;
+  padding-bottom: 5px;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 5px;
 }
 
 .field {
-  width: 4em;
+  width: 6em;
 }
 
 .value {
@@ -54,15 +37,68 @@
   width: 3em;
 }
 
-.dirSelect {
-  background-image: url('../../resources/images/Folder.png');
-  background-color: khaki;
+.settings {
+  background-image: url('../../resources/images/Settings.png');
   background-repeat: no-repeat;
   background-position: 0 0;
+  background-color: #ddd;
   border: none;
   cursor: pointer;
   height: 20px;
-  padding-left: 15px;
+  padding-left: 14px;
+}
+
+.videoList {
+  background-color: #fff;
+  height: 10em;
+  border: 1px solid #767676;
+}
+
+.addVideo {
+  background-image: url('../../resources/images/AddItem.png');
+  background-repeat: no-repeat;
+  background-position: 0 0;
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  width: 14px;
+  height: 14px;
+  margin-left: 5px;
+}
+
+.videoListItem {
+  padding-left: 5px;
+  padding-right: 5px;
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+
+.removeVideo {
+  background-image: url('../../resources/images/RemoveItem.png');
+  background-repeat: no-repeat;
+  background-position: 0 0;
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  width: 14px;
+  height: 14px;
+  margin-left: 5px;
+}
+
+.metadataTextArea {
+  height: 10em;
+}
+
+.refresh {
+  background-image: url('../../resources/images/Reload.png');
+  background-repeat: no-repeat;
+  background-position: 0 0;
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  width: 14px;
+  height: 14px;
+  margin-right: 5px;
 }
 
 .videoFormatText {
@@ -96,13 +132,13 @@
 }
 
 .log {
-  flex: 3;
   display: flex;
 }
 
 .logTextArea {
   width: 100%;
   resize: none;
+  height: 10em;
 }
 
 .previewOuter {
@@ -127,37 +163,6 @@
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
-}
-
-.programNames {
-  flex: 1;
-  display: flex;
-}
-
-.settings {
-  background-image: url('../../resources/images/Settings.png');
-  background-repeat: no-repeat;
-  background-position: 0 0;
-  background-color: #ddd;
-  border: none;
-  cursor: pointer;
-  height: 20px;
-  padding-left: 14px;
-}
-
-.programText {
-  padding: 5px;
-  background-color: #333;
-  display: flex;
-  height: 100%;
-}
-
-.programTextArea {
-  width: 100%;
-  background-color: #333;
-  color: #ddd;
-  border: none;
-  resize: none;
 }
 
 .modalOverlay {
@@ -195,3 +200,42 @@
 .modalField {
   width: 8em;
 }
+
+
+
+
+
+
+
+.dirSelect {
+  background-image: url('../../resources/images/Folder.png');
+  background-color: khaki;
+  background-repeat: no-repeat;
+  background-position: 0 0;
+  border: none;
+  cursor: pointer;
+  height: 20px;
+  padding-left: 15px;
+}
+
+.programNames {
+  flex: 1;
+  display: flex;
+}
+
+
+.programText {
+  padding: 5px;
+  background-color: #333;
+  display: flex;
+  height: 100%;
+}
+
+.programTextArea {
+  width: 100%;
+  background-color: #333;
+  color: #ddd;
+  border: none;
+  resize: none;
+}
+

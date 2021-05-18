@@ -257,7 +257,7 @@ const createControlWindow = async () => {
 
   controlWindow = new BrowserWindow({
     show: false,
-    width: 1150,
+    width: 600,
     height: 850,
     webPreferences:
       (process.env.NODE_ENV === 'development' ||
@@ -412,7 +412,7 @@ ipcMain.on('selectRootDirectory', (event, initialDirectory: string) => {
  * an empty string will be passed as the parameter.
  */
 ipcMain.on('selectFfmpegPath', (event, initialPath: string) => {
-  // Open a modal directory selection dialog
+  // Open a modal file selection dialog
   if (controlWindow === null) {
     throw new Error('Cannot select ffmpeg path when control window is null');
   }
@@ -425,6 +425,34 @@ ipcMain.on('selectFfmpegPath', (event, initialPath: string) => {
   );
 
   // Pass the selected path to the control window
+  if (result !== undefined && result.length > 0) {
+    [event.returnValue] = result;
+  } else {
+    event.returnValue = null;
+  }
+});
+
+/**
+ * The "selectVideo" IPC function will be called by the control window when
+ * the user wants to select an mp4 video file.
+ */
+ipcMain.on('selectVideo', (event) => {
+  // Open a modal file selection dialog
+  if (controlWindow === null) {
+    throw new Error('Cannot select video when control window is null');
+  }
+  const result: string[] | undefined = dialog.showOpenDialogSync(
+    controlWindow,
+    {
+      properties: ['openFile'],
+      filters: [
+        { name: 'Movies', extensions: ['mp4'] },
+        { name: 'All Files', extensions: ['*'] },
+      ],
+    }
+  );
+
+  // Pass the selected video to the control window
   if (result !== undefined && result.length > 0) {
     [event.returnValue] = result;
   } else {

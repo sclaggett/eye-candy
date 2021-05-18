@@ -1,8 +1,10 @@
 # eye-native
 
-This is the native library for the eye-candy and eye-projector repositories.
+This is the native library for the *eye-candy* and *eye-projector* projects.
 
-Initialize dependencies by running `yarn install` and build the library by running `yarn build`.
+You do not need to build this project separately unless you're working directly on the native code. When building the *eye-candy* and *eye-projector* projects, the contents of this project will be copied into their `node_modules` directories and built there,
+
+Local development is initialized by running `yarn install` and built by running `yarn build`.
 
 ## Compiling OpenCV
 

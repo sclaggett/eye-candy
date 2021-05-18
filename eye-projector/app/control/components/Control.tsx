@@ -1,50 +1,48 @@
 import { ipcRenderer, IpcRendererEvent, nativeImage } from 'electron';
-import fs from 'fs';
 import Modal from 'react-modal';
-import path from 'path';
 import React from 'react';
-import StartProgram from '../../shared/StartProgram';
+import { ReOrderableItem, ReOrderableList } from 'react-reorderable-list';
+import { ListGroup } from 'react-bootstrap';
 import * as styles from './Control.css';
 
 // Require the eye-native library but remember that we can't use it in a renderer
 // process until the main process notifies us of the module root
 const eyeNative = require('eye-native');
 
-// Give the modal library the name of this app's root div. Check first to make sure that
-// we're executing in the control window because for some reason this code appears to also
-// be run in the stimulus window for reasons that aren't clear to me.
+// Give the modal library the name of this app's root div
 const rootDiv = document.getElementById('controlRoot');
-if (rootDiv) {
-  Modal.setAppElement('#controlRoot');
-}
+Modal.setAppElement('#controlRoot');
 
 type ControlProps = {
   dummy: string;
 };
 
 type ControlState = {
+  // The output name is generate from the root directory, the current date, and any
+  // existing experiment files
+  outputName: string;
+
   // These fields are initialized from the user settings and can be changed
   // using the settings dialog
   rootDirectory: string;
-  outputName: string;
   ffmpegPath: string;
-  seed: number;
-  stampFrames: boolean;
-  saveStimuli: boolean;
-  limitSeconds: number;
+  projectorLatency: number;
+  scaleToFit: boolean;
 
-  // These fields are initialized from the user settings and can be changed
-  // on this control page
-  width: number;
-  height: number;
+  // List of video in the order they will be played, each with "id" and "path" fields
+  videos: string[];
+
+  // User-defined metadata that describes the experiment
+  metadata: string;
+
+  // Projector information relayed to us by the main process
+  projDetected: boolean;
+  projWidth: number;
+  projHeight: number;
+  projMaxFps: number;
+
+  // Playback frame rate
   fps: number;
-
-  // List of program names for the dropdown, the name of the selected program,
-  // a flag indicating if it has unsaved changes, and its text
-  programNames: string[];
-  programName: string;
-  programDirty: boolean;
-  programText: string;
 
   // Log messages
   log: string;
@@ -68,13 +66,13 @@ export default class Control extends React.Component<
   ControlProps,
   ControlState
 > {
+  metadataTextArea: React.RefObject<HTMLTextAreaElement>;
+
   logTextArea: React.RefObject<HTMLTextAreaElement>;
 
   previewContainer: React.RefObject<HTMLDivElement>;
 
   previewInterval: ReturnType<typeof setInterval> | null;
-
-  programDirectory: string;
 
   constructor(props: ControlProps) {
     super(props);
@@ -89,20 +87,18 @@ export default class Control extends React.Component<
 
     // Define the initial state
     this.state = {
+      outputName: '',
       rootDirectory: '',
-      outputName: 'test',
       ffmpegPath: initFfmpegPath,
-      seed: 108,
-      stampFrames: false,
-      saveStimuli: false,
-      limitSeconds: 0,
-      width: 1024,
-      height: 720,
+      projectorLatency: 0,
+      scaleToFit: false,
+      videos: [],
+      metadata: '',
+      projDetected: false,
+      projWidth: 0,
+      projHeight: 0,
+      projMaxFps: 0,
       fps: 30,
-      programNames: ['Untitled'],
-      programName: 'Untitled',
-      programDirty: false,
-      programText: '',
       log: '',
       running: false,
       progress: 0,
@@ -115,22 +111,25 @@ export default class Control extends React.Component<
     };
 
     // Initialize variables
+    this.metadataTextArea = React.createRef();
     this.logTextArea = React.createRef();
     this.previewContainer = React.createRef();
     this.previewInterval = null;
-    this.programDirectory = '';
 
     // Bind the IPC handlers and other callbacks so "this" will be defined when
     // they are invoked
     this.onInputChange = this.onInputChange.bind(this);
     this.onCheckboxChange = this.onCheckboxChange.bind(this);
     this.onTextAreaChange = this.onTextAreaChange.bind(this);
+    this.onVideoListUpdate = this.onVideoListUpdate.bind(this);
+    this.onAddVideo = this.onAddVideo.bind(this);
+    this.onRemoveVideo = this.onRemoveVideo.bind(this);
+    this.onProjectorRefresh = this.onProjectorRefresh.bind(this);
     this.onStartButtonClick = this.onStartButtonClick.bind(this);
     this.onStopButtonClick = this.onStopButtonClick.bind(this);
     this.onLog = this.onLog.bind(this);
     this.onRunPreviewChannel = this.onRunPreviewChannel.bind(this);
     this.onPreviewInterval = this.onPreviewInterval.bind(this);
-    this.onProgramSelected = this.onProgramSelected.bind(this);
     this.onRunProgress = this.onRunProgress.bind(this);
     this.onRunStopped = this.onRunStopped.bind(this);
     this.onDirectorySelectClick = this.onDirectorySelectClick.bind(this);
@@ -168,31 +167,6 @@ export default class Control extends React.Component<
       })
       .catch(() => {
         console.log('Failed to get home directory');
-      });
-
-    ipcRenderer
-      .invoke('getProgramsDirectory')
-      .then((programDir) => {
-        this.programDirectory = programDir;
-        fs.readdir(
-          this.programDirectory,
-          (err: ErrnoException | null, files: string[]) => {
-            if (err) {
-              throw new Error(`Failed to read programs directory: ${err}`);
-            }
-            const programNames: string[] = [];
-            for (let i = 0; i < files.length; i += 1) {
-              programNames.push(files[i]);
-            }
-            this.setState((prevState) => ({
-              programNames: prevState.programNames.concat(programNames),
-            }));
-          }
-        );
-        return null;
-      })
-      .catch(() => {
-        console.log('Failed to get programs directory');
       });
   }
 
@@ -241,11 +215,58 @@ export default class Control extends React.Component<
   }
 
   /*
+   * The following functions are invoked when the user reorders the video list, clicks the
+   * button to add a new video, or removes an existing video. Each action is handled in a
+   * specific way to meet React's constraints on modifying the state.
+   */
+  onVideoListUpdate(newList) {
+    this.setState({
+      videos: newList,
+    });
+  }
+
+  onAddVideo(event) {
+    const selectedVideo: string | null = ipcRenderer.sendSync('selectVideo');
+    if (selectedVideo === null) {
+      return;
+    }
+    const id = Date.now().toString(36) + Math.random().toString(36).substr(2);
+    const videoObject = {
+      id,
+      path: selectedVideo,
+    };
+    console.log(`## Adding video object: ${JSON.stringify(videoObject)}`);
+    this.setState((prevState) => ({
+      videos: [...prevState.videos, videoObject],
+    }));
+  }
+
+  onRemoveVideo(event) {
+    const { id } = event.target;
+    console.log(`## Removing video ID: ${id}`);
+    this.setState((prevState) => ({
+      videos: prevState.videos.filter(function (e) {
+        return e.id !== id;
+      }),
+    }));
+  }
+
+  /*
+   * The following callback is invoked when the user wants to run the projector detection
+   * process again.
+   */
+  onProjectorRefresh(event) {
+    console.log('## Refresh projector');
+  }
+
+  /*
    * The following two functions will be invoked when the user clicks the Compile/Start
    * buttons or the Stop button. In both cases, the signals will be passed to the main
    * process.
    */
   onStartButtonClick(event: React.MouseEvent<HTMLInputElement, MouseEvent>) {
+    console.log('## Start');
+    /*
     // Create an instance of the StartProgram arguments
     const args: StartProgram = new StartProgram();
     args.rootDirectory = this.state.rootDirectory;
@@ -270,10 +291,12 @@ export default class Control extends React.Component<
       progress: 0,
       imageUrl: '',
     } as unknown) as ControlState);
+    */
   }
 
   onStopButtonClick() {
-    ipcRenderer.send('cancelProgram');
+    console.log('## Stop');
+    // ipcRenderer.send('cancelProgram');
   }
 
   /*
@@ -351,51 +374,6 @@ export default class Control extends React.Component<
   }
 
   /*
-   * The onProgramSelected() callback is invoked when the user selects a program name from
-   * the dropdown.
-   */
-  onProgramSelected(event: React.ChangeEvent<HTMLSelectElement>) {
-    // Get the program name
-    if (
-      event.target === null ||
-      event.target.value === null ||
-      event.target.value === undefined
-    ) {
-      return;
-    }
-    const programName: string = event.target.value as string;
-
-    // Update the state
-    this.setState(({
-      programName,
-    } as unknown) as ControlState);
-
-    // Clear the program if "New" was selected
-    if (programName === 'New') {
-      this.setState(({
-        programText: '',
-      } as unknown) as ControlState);
-      return;
-    }
-
-    // Load the program from the file system
-    fs.readFile(
-      path.join(this.programDirectory, programName),
-      (err: ErrnoException | null, data: Buffer) => {
-        // Make sure the file was loaded successfully
-        if (err) {
-          throw err;
-        }
-
-        // Set the program text
-        this.setState(({
-          programText: data.toString(),
-        } as unknown) as ControlState);
-      }
-    );
-  }
-
-  /*
    * The onRunProgress() function will be invoked by the main process at regular
    * intervals to notify the control window as the run progresses.
    */
@@ -466,7 +444,6 @@ export default class Control extends React.Component<
    * open and close.
    */
   onToggleSettingsDialog() {
-    console.log('## Toggle settings');
     this.setState((prevState) => ({
       settingsOpen: !prevState.settingsOpen,
     }));
@@ -479,12 +456,19 @@ export default class Control extends React.Component<
   render() {
     // Check if we're not ready to start running.
     const notReadyToRun: boolean =
-      this.state.rootDirectory.length === 0 ||
       this.state.outputName.length === 0 ||
-      this.state.programText.length === 0 ||
-      this.state.width === 0 ||
-      this.state.height === 0 ||
+      this.state.rootDirectory.length === 0 ||
+      this.state.ffmpegPath.length === 0 ||
+      this.state.projectorLatency === 0 ||
+      this.state.videos.length === 0 ||
+      this.state.projDetected === false ||
       this.state.fps === 0;
+    let projInfo = '';
+    if (this.state.projDetected) {
+      projInfo = `Max ${this.state.projWidth} x ${this.state.projHeight} at ${this.state.projMaxFps} fps`;
+    } else {
+      projInfo = 'Not detected';
+    }
     const previewContainerStyle = {
       top: `${this.state.imageTop}px`,
       left: `${this.state.imageLeft}px`,
@@ -492,146 +476,141 @@ export default class Control extends React.Component<
       height: `${this.state.imageHeight}px`,
     };
 
-    console.log(`## Set dirty: ${this.state.programDirty}`);
-
     return (
       <div className={styles.container}>
-        <div className={styles.columns}>
-          <div className={styles.columnLeft}>
-            <div className={styles.row}>
-              <div className={styles.field}>Name</div>
-              <div className={styles.value}>
-                <input
-                  className={styles.input}
-                  type="text"
-                  name="outputName"
-                  value={this.state.outputName}
-                  disabled={this.state.running}
-                  onChange={this.onInputChange}
-                />
-              </div>
-            </div>
-            <div className={styles.row}>
-              <div className={styles.field}>Format</div>
-              <div className={styles.value}>
-                <input
-                  className={styles.inputNarrow}
-                  type="text"
-                  name="width"
-                  value={this.state.width}
-                  disabled={this.state.running}
-                  onChange={this.onInputChange}
-                />
-                <div className={styles.videoFormatText}>x</div>
-                <input
-                  className={styles.inputNarrow}
-                  type="text"
-                  name="height"
-                  value={this.state.height}
-                  disabled={this.state.running}
-                  onChange={this.onInputChange}
-                />
-                <div className={styles.videoFormatText}>@</div>
-                <input
-                  className={styles.inputNarrow}
-                  type="text"
-                  name="fps"
-                  value={this.state.fps}
-                  disabled={this.state.running}
-                  onChange={this.onInputChange}
-                />
-                <div className={styles.videoFormatText}>fps</div>
-              </div>
-            </div>
-            <div className={styles.row}>
-              <div className={styles.buttons}>
-                <div className={styles.buttonPadding} />
-                <input
-                  className={styles.button}
-                  type="button"
-                  value="Compile"
-                  disabled={notReadyToRun || this.state.running}
-                  onClick={this.onStartButtonClick}
-                />
-                <input
-                  className={styles.button}
-                  type="button"
-                  value="Run"
-                  disabled={notReadyToRun || this.state.running}
-                  onClick={this.onStartButtonClick}
-                />
-                <input
-                  className={styles.button}
-                  type="button"
-                  value="Stop"
-                  disabled={notReadyToRun || !this.state.running}
-                  onClick={this.onStopButtonClick}
-                />
-                <div
-                  className={styles.progress}
-                  style={this.state.running ? {} : { visibility: 'hidden' }}
-                >
-                  {`${this.state.progress.toString()}%`}
-                </div>
-              </div>
-            </div>
-            <div className={styles.log}>
-              <textarea
-                className={styles.logTextArea}
-                ref={this.logTextArea}
-                name="programText"
-                value={this.state.log}
-                readOnly
-                onChange={this.onTextAreaChange}
-              />
-            </div>
-            <div className={styles.previewOuter} ref={this.previewContainer}>
-              <div
-                className={styles.previewInner}
-                style={previewContainerStyle}
-              >
-                <img
-                  className={styles.previewImage}
-                  src={this.state.imageUrl}
-                  style={this.state.running ? {} : { visibility: 'hidden' }}
-                  alt=""
-                />
-              </div>
+        <div className={styles.row}>
+          <div className={styles.field}>Output</div>
+          <div className={styles.value}>
+            <input
+              className={styles.input}
+              type="text"
+              name="outputName"
+              value={this.state.outputName}
+              disabled={this.state.running}
+              onChange={this.onInputChange}
+            />
+          </div>
+          <input
+            className={styles.settings}
+            type="button"
+            disabled={this.state.running}
+            onClick={this.onToggleSettingsDialog}
+          />
+        </div>
+        <div className={styles.rows}>
+          <div className={styles.field}>
+            Videos
+            <input
+              className={styles.addVideo}
+              type="button"
+              disabled={this.state.running}
+              onClick={this.onAddVideo}
+            />
+          </div>
+          <div className={styles.videoList}>
+            <ReOrderableList
+              name="videoList"
+              list={this.state.videos}
+              onListUpdate={this.onVideoListUpdate}
+              component={ListGroup}
+            >
+              {this.state.videos.map((data, index) => (
+                <ReOrderableItem key={`item-${data.id}`}>
+                  <ListGroup.Item>
+                    <div className={styles.videoListItem}>
+                      {data.path}
+                      <input
+                        className={styles.removeVideo}
+                        type="button"
+                        disabled={this.state.running}
+                        onClick={this.onRemoveVideo}
+                        id={data.id}
+                      />
+                    </div>
+                  </ListGroup.Item>
+                </ReOrderableItem>
+              ))}
+            </ReOrderableList>
+          </div>
+        </div>
+        <div className={styles.rows}>
+          <div className={styles.field}>Metadata</div>
+          <textarea
+            className={styles.metadataTextArea}
+            ref={this.metadataTextArea}
+            name="metadata"
+            value={this.state.metadata}
+            onChange={this.onTextAreaChange}
+          />
+        </div>
+        <div className={styles.row}>
+          <div className={styles.field}>Projector</div>
+          <div className={styles.value}>{projInfo}</div>
+          <input
+            className={styles.refresh}
+            type="button"
+            disabled={this.state.running}
+            onClick={this.onProjectorRefresh}
+          />
+        </div>
+        <div className={styles.row}>
+          <div className={styles.field}>Playback</div>
+          <div className={styles.value}>
+            <input
+              className={styles.inputNarrow}
+              type="text"
+              name="fps"
+              value={this.state.fps}
+              disabled={this.state.running}
+              onChange={this.onInputChange}
+            />
+            <div className={styles.videoFormatText}>fps</div>
+          </div>
+        </div>
+
+        <div className={styles.row}>
+          <div className={styles.buttons}>
+            <div className={styles.buttonPadding} />
+            <input
+              className={styles.button}
+              type="button"
+              value="Run"
+              disabled={notReadyToRun || this.state.running}
+              onClick={this.onStartButtonClick}
+            />
+            <input
+              className={styles.button}
+              type="button"
+              value="Stop"
+              disabled={notReadyToRun || !this.state.running}
+              onClick={this.onStopButtonClick}
+            />
+            <div
+              className={styles.progress}
+              style={this.state.running ? {} : { visibility: 'hidden' }}
+            >
+              {`${this.state.progress.toString()}%`}
             </div>
           </div>
-          <div className={styles.columnRight}>
-            <div className={styles.row}>
-              <div className={styles.programNames}>
-                <select
-                  className={styles.input}
-                  name="programName"
-                  value={this.state.programName}
-                  disabled={this.state.running}
-                  onChange={this.onProgramSelected}
-                >
-                  {this.state.programNames.map((program) => (
-                    <option key={program} value={program}>
-                      {program}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  className={styles.settings}
-                  type="button"
-                  disabled={this.state.running}
-                  onClick={this.onToggleSettingsDialog}
-                />
-              </div>
-            </div>
-            <div className={styles.programText}>
-              <textarea
-                className={styles.programTextArea}
-                name="programText"
-                value={this.state.programText}
-                disabled={this.state.running}
-                onChange={this.onTextAreaChange}
-              />
-            </div>
+        </div>
+        <div className={styles.log}>
+          <textarea
+            className={styles.logTextArea}
+            ref={this.logTextArea}
+            name="programText"
+            value={this.state.log}
+            readOnly
+            onChange={this.onTextAreaChange}
+          />
+        </div>
+        <div className={styles.previewOuter} ref={this.previewContainer}>
+          <div className={styles.previewInner} style={previewContainerStyle}>
+            <img
+              className={styles.previewImage}
+              src={this.state.imageUrl}
+              style={this.state.running ? {} : { visibility: 'hidden' }}
+              alt=""
+            />
           </div>
         </div>
 
@@ -678,37 +657,26 @@ export default class Control extends React.Component<
               </div>
             </div>
             <div className={styles.modalRow}>
-              <div className={styles.modalField}>Stamp frames:</div>
-              <div className={styles.value}>
-                <input
-                  type="checkbox"
-                  name="stampFrames"
-                  checked={this.state.stampFrames}
-                  onChange={this.onCheckboxChange}
-                />
-              </div>
-            </div>
-            <div className={styles.modalRow}>
-              <div className={styles.modalField}>Save stimuli</div>
-              <div className={styles.value}>
-                <input
-                  type="checkbox"
-                  name="saveStimuli"
-                  checked={this.state.saveStimuli}
-                  onChange={this.onCheckboxChange}
-                />
-              </div>
-            </div>
-            <div className={styles.modalRow}>
-              <div className={styles.modalField}>Limit duration</div>
+              <div className={styles.modalField}>Projector latency</div>
               <input
                 className={styles.input}
                 type="text"
-                name="limitSeconds"
-                value={this.state.limitSeconds}
+                name="projectorLatency"
+                value={this.state.projectorLatency}
                 onChange={this.onInputChange}
               />
-              sec
+              ms
+            </div>
+            <div className={styles.modalRow}>
+              <div className={styles.modalField}>Scale to fit:</div>
+              <div className={styles.value}>
+                <input
+                  type="checkbox"
+                  name="scaleToFit"
+                  checked={this.state.scaleToFit}
+                  onChange={this.onCheckboxChange}
+                />
+              </div>
             </div>
           </div>
         </Modal>

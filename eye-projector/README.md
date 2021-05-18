@@ -4,15 +4,21 @@ TODO:
 
 - All this.
 
-## Grating
+- Output file, config button:
+  + root directory
+  + ffmpeg location
+  + projector latency
+  + scaling method
+- List of mp4 video files (add, remove, reorder)
+- Metadata
+- Projector info (dimensions, max frame rate, refresh)
+- Frame rate
+- Run/Stop buttons
+- Preview panel
 
-{"value":{"lifespan":2,"backgroundColor":"black","metadata":{"group":"f467fb9e-41bf-4b7f-af43-050798f8af20","cohort":"06b0f056-1fa8-4357-af4d-441a85299e49","class":"REVERSE","block":true},"age":0,"stimulusType":"GRATING","speed":200,"width":132,"angle":3.9269908169872414,"barColor":"white"},"done":false,"stimulusIndex":4}
 
-**Note.** This project is currently in a state of flux while it is being ported to the Electron framework. The [old project](old/README.md) is still around and can be found in the `old` folder.
 
 **Licenses.** This project is proprietary (unlicensed) and owned by the University of Washington.
-
-All frameworks used here are released under the permissive MIT license: Electron, Electron React Boilerplate, React, Redux, React Router, Webpack, and React Hot Loader.
 
 ## Data types
 
