@@ -3,6 +3,7 @@ import Modal from 'react-modal';
 import React from 'react';
 import { ReOrderableItem, ReOrderableList } from 'react-reorderable-list';
 import { ListGroup } from 'react-bootstrap';
+import ProjectorInfo from '../../shared/ProjectorInfo';
 import * as styles from './Control.css';
 
 // Require the eye-native library but remember that we can't use it in a renderer
@@ -39,7 +40,7 @@ type ControlState = {
   projDetected: boolean;
   projWidth: number;
   projHeight: number;
-  projMaxFps: number;
+  projFps: number;
 
   // Playback frame rate
   fps: number;
@@ -97,7 +98,7 @@ export default class Control extends React.Component<
       projDetected: false,
       projWidth: 0,
       projHeight: 0,
-      projMaxFps: 0,
+      projFps: 0,
       fps: 30,
       log: '',
       running: false,
@@ -128,6 +129,7 @@ export default class Control extends React.Component<
     this.onStartButtonClick = this.onStartButtonClick.bind(this);
     this.onStopButtonClick = this.onStopButtonClick.bind(this);
     this.onLog = this.onLog.bind(this);
+    this.onDisplayChange = this.onDisplayChange.bind(this);
     this.onRunPreviewChannel = this.onRunPreviewChannel.bind(this);
     this.onPreviewInterval = this.onPreviewInterval.bind(this);
     this.onRunProgress = this.onRunProgress.bind(this);
@@ -138,6 +140,7 @@ export default class Control extends React.Component<
 
     // Listen for IPC calls
     ipcRenderer.on('log', this.onLog);
+    ipcRenderer.on('displayChange', this.onDisplayChange);
     ipcRenderer.on('runPreviewChannel', this.onRunPreviewChannel);
     ipcRenderer.on('runProgress', this.onRunProgress);
     ipcRenderer.on('runStopped', this.onRunStopped);
@@ -167,7 +170,9 @@ export default class Control extends React.Component<
       })
       .catch(() => {
         console.log('Failed to get home directory');
+        return null;
       });
+    this.onProjectorRefresh();
   }
 
   /*
@@ -252,11 +257,31 @@ export default class Control extends React.Component<
   }
 
   /*
-   * The following callback is invoked when the user wants to run the projector detection
-   * process again.
+   * The following callback is invoked when the window is created and any time the user
+   * wants to run the projector detection process again.
    */
   onProjectorRefresh(event) {
-    console.log('## Refresh projector');
+    ipcRenderer
+      .invoke('detectProjector')
+      .then((projector: ProjectorInfo | null) => {
+        if (projector) {
+          this.setState({
+            projDetected: true,
+            projWidth: projector.width,
+            projHeight: projector.height,
+            projFps: projector.fps,
+          });
+        } else {
+          this.setState({
+            projDetected: false,
+          });
+        }
+        return null;
+      })
+      .catch(() => {
+        console.log('Failed to detect projector');
+        return null;
+      });
   }
 
   /*
@@ -307,6 +332,14 @@ export default class Control extends React.Component<
     this.setState((prevState) => ({
       log: prevState.log + message,
     }));
+  }
+
+  /*
+   * The onDisplayChange() function will be invoked by the main process when it detects
+   * a change to the number of displays.
+   */
+  onDisplayChange(_event: IpcRendererEvent) {
+    this.onProjectorRefresh();
   }
 
   /*
@@ -465,7 +498,7 @@ export default class Control extends React.Component<
       this.state.fps === 0;
     let projInfo = '';
     if (this.state.projDetected) {
-      projInfo = `Max ${this.state.projWidth} x ${this.state.projHeight} at ${this.state.projMaxFps} fps`;
+      projInfo = `${this.state.projWidth} x ${this.state.projHeight} at ${this.state.projFps} fps`;
     } else {
       projInfo = 'Not detected';
     }

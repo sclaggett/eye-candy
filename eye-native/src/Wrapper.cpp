@@ -15,6 +15,8 @@ Napi::Object wrapper::Init(Napi::Env env, Napi::Object exports)
   exports.Set("checkCompletedFrames", Napi::Function::New(env, wrapper::checkCompletedFrames));
   exports.Set("closeVideoOutput", Napi::Function::New(env, wrapper::closeVideoOutput));
 
+  exports.Set("getDisplayFrequency", Napi::Function::New(env, wrapper::getDisplayFrequency));
+
   exports.Set("createPreviewChannel", Napi::Function::New(env, wrapper::createPreviewChannel));
   exports.Set("openPreviewChannel", Napi::Function::New(env, wrapper::openPreviewChannel));
   exports.Set("getNextFrame", Napi::Function::New(env, wrapper::getNextFrame));
@@ -91,6 +93,21 @@ void wrapper::closeVideoOutput(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
   native::closeVideoOutput(env);
+}
+
+Napi::Number wrapper::getDisplayFrequency(const Napi::CallbackInfo& info)
+{
+  Napi::Env env = info.Env();
+  if ((info.Length() != 2) ||
+    !info[0].IsNumber() ||
+    !info[1].IsNumber())
+  {
+    Napi::TypeError::New(env, "Incorrect parameter type").ThrowAsJavaScriptException();
+    return Napi::Number::New(env, -1);
+  }
+  Napi::Number x = info[0].As<Napi::Number>();
+  Napi::Number y = info[1].As<Napi::Number>();
+  return Napi::Number::New(env, native::getDisplayFrequency(env, x, y));
 }
 
 Napi::String wrapper::createPreviewChannel(const Napi::CallbackInfo& info)

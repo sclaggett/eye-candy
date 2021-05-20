@@ -12,10 +12,18 @@
  * Any log statements will be written to the terminal window.
  */
 
-import { app, BrowserWindow, dialog, nativeImage, Rectangle } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  nativeImage,
+  Rectangle,
+  screen,
+} from 'electron';
 import path from 'path';
 import url from 'url';
 import MenuBuilder from './menu';
+import ProjectorInfo from '../shared/ProjectorInfo';
 
 const { execFileSync } = require('child_process');
 const fs = require('fs');
@@ -165,11 +173,58 @@ const createControlWindow = async () => {
 };
 
 /**
+ * The function below will notify the control window of any changes to the
+ * list of displays.
+ */
+function onDisplayChange() {
+  if (controlWindow && controlWindow.webContents) {
+    controlWindow.webContents.send('displayChange');
+  }
+}
+
+/**
  * The starting point for an electron application is when the ready event is
  * emitted by the framework.
  */
 app.on('ready', () => {
+  // Listen for displaying being added, removed, or changed
+  screen.on('display-added', (event, newDisplay) => {
+    onDisplayChange();
+  });
+  screen.on('display-removed', (event, oldDisplay) => {
+    onDisplayChange();
+  });
+  screen.on('display-metrics-changed', (event, display, changedMetrics) => {
+    onDisplayChange();
+  });
+
+  // Create the control window
   createControlWindow();
+});
+
+/**
+ * The "detectProjector" IPC function will be called by the control window when it
+ * wants to check the status of any attached projector. Assume the primary display
+ * is the user's main monitor and any secondary display is the projector.
+ */
+ipcMain.handle('detectProjector', async (_event: Event) => {
+  const displays = screen.getAllDisplays();
+  const projector = displays.find((display) => {
+    return display.bounds.x !== 0 || display.bounds.y !== 0;
+  });
+  if (projector) {
+    console.log(`## Projector: ${JSON.stringify(projector)}`);
+    const projInfo: ProjectorInfo = new ProjectorInfo();
+    projInfo.width = projector.bounds.width;
+    projInfo.height = projector.bounds.height;
+    projInfo.fps = eyeNative.getDisplayFrequency(
+      projector.bounds.x + projector.bounds.width / 2,
+      projector.bounds.y + projector.bounds.height / 2
+    );
+    console.log(`## Projector info: ${projInfo}`);
+    return projInfo;
+  }
+  return null;
 });
 
 /**

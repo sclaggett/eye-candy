@@ -117,6 +117,12 @@ void native::closeVideoOutput(Napi::Env env)
   gRecording = false;
 }
 
+uint32_t native::getDisplayFrequency(Napi::Env env, int32_t x, int32_t y)
+{
+  printf("## native::getDisplayFrequency(%i, %i)\n", x, y);
+  return 100;
+}
+
 string native::createPreviewChannel(Napi::Env env, string& channelName)
 {
   // Make sure the main thread is running

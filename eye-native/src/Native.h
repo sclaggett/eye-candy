@@ -15,6 +15,8 @@ namespace native
   std::vector<int32_t> checkCompletedFrames(Napi::Env env);
   void closeVideoOutput(Napi::Env env);
 
+  uint32_t getDisplayFrequency(Napi::Env env, int32_t x, int32_t y);
+
   std::string createPreviewChannel(Napi::Env env, std::string& channelName);
   std::string openPreviewChannel(Napi::Env env, std::string name);
   bool getNextFrame(Napi::Env env, uint8_t*& frame, size_t& length, int maxWidth,

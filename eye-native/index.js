@@ -31,8 +31,8 @@ function setModuleRoot(moduleRoot) {
 }
 
 /**
- * The initializeFfmpeg() function should be called before anything else to 
- * set the location of the FFmpeg executable.
+ * The initializeFfmpeg() function should be called before any of the video-related
+ * functions below to set the location of the FFmpeg executable.
  */
 function initializeFfmpeg(ffmpegPath) {
   if (native === null) {
@@ -76,13 +76,21 @@ function closeVideoOutput() {
 }
 
 /**
- * Use the functions in this section to open an existing video file, read the frames,
- * and close when finished.
+ * Use the functions in this section to create a full screen window on the projector,
+ * play an existing video file to it, and close when finished. The helper function
+ * allows us to get a monitor's display frequency.
  */
 
 // openVideoInput
 // readNextFrame
 // closeVideoInput
+
+function getDisplayFrequency(x, y) {
+  if (native === null) {
+    throw new Error('Native module has not been initialized');
+  }
+  return native.getDisplayFrequency(x, y);
+}
 
 /**
  * The functions in this section give us the ability to process a video in the main thread
@@ -128,6 +136,7 @@ module.exports = {
   queueNextFrame,
   checkCompletedFrames,
   closeVideoOutput,
+  getDisplayFrequency,
   createPreviewChannel,
   openPreviewChannel,
   getNextFrame,
