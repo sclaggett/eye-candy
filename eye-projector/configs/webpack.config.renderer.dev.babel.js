@@ -52,7 +52,6 @@ export default merge.smart(baseConfig, {
     `webpack-dev-server/client?http://localhost:${port}/`,
     'webpack/hot/only-dev-server',
     require.resolve('../app/control/control.tsx'),
-    require.resolve('../app/stimulus/stimulus.tsx'),
   ],
 
   output: {
