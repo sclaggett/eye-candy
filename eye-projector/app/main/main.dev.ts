@@ -24,6 +24,7 @@ import path from 'path';
 import url from 'url';
 import MenuBuilder from './menu';
 import ProjectorInfo from '../shared/ProjectorInfo';
+import StartRun from '../shared/StartRun';
 
 const { execFileSync } = require('child_process');
 const fs = require('fs');
@@ -203,9 +204,9 @@ app.on('ready', () => {
 });
 
 /**
- * The "detectProjector" IPC function will be called by the control window when it
- * wants to check the status of any attached projector. Assume the primary display
- * is the user's main monitor and any secondary display is the projector.
+ * The "detectProjector" IPC function will be called by the control window when it wants
+ * to check the status of any attached projector. Assume the primary display is the
+ * user's main monitor and any secondary display is the projector.
  */
 ipcMain.handle('detectProjector', async (_event: Event) => {
   const displays = screen.getAllDisplays();
@@ -214,6 +215,8 @@ ipcMain.handle('detectProjector', async (_event: Event) => {
   });
   if (projector) {
     const projInfo: ProjectorInfo = new ProjectorInfo();
+    projInfo.x = projector.bounds.x;
+    projInfo.y = projector.bounds.y;
     projInfo.width = projector.bounds.width;
     projInfo.height = projector.bounds.height;
     projInfo.fps = eyeNative.getDisplayFrequency(
@@ -314,11 +317,81 @@ ipcMain.on('selectVideo', (event) => {
 });
 
 /**
- * The "programFailure" IPC function will be called by the stimulus window if the
- * program encounters a fatal error.
+ * The "startRun" IPC function is invoked when the user wants to begin playing back a
+ * series of video files to the projector.
  */
-ipcMain.on('programFailure', (_event, message: string) => {
-  log(`Program failure: ${message}`);
+ipcMain.on('startRun', (_event, stringArg: string) => {
+  // Deserialize the arguments
+  const args: StartRun = JSON.parse(stringArg) as StartRun;
+
+  // Check the executable path
+  log('Checking FFmpeg executable...\n');
+  try {
+    fs.accessSync(args.ffmpegPath, fs.constants.X_OK);
+  } catch (err) {
+    log(`Error: Failed to find executable at ${args.ffmpegPath}\n`);
+    return false;
+  }
+
+  // Check the FFmpeg version
+  log('Detecting FFmpeg version...\n');
+  let result: string = execFileSync(args.ffmpegPath, [
+    '-hide_banner',
+    '-version',
+  ]);
+  const lines = result.toString().split(/\r?\n/);
+  let version = '';
+  for (let i = 0; i < lines.length; i += 1) {
+    if (lines[i].includes('ffmpeg version')) {
+      const words = lines[i].split(' ');
+      const { 2: ver } = words;
+      version = ver;
+    }
+  }
+  if (version === '') {
+    log('Error: Failed to detect version\n');
+    return false;
+  }
+  log(`Detected version ${version}\n`);
+
+  // Initialize the native library with the location of ffmpeg and start playing back
+  // the list of video files
+  eyeNative.initializeFfmpeg(args.ffmpegPath);
+  result = eyeNative.beginVideoPlayback(
+    args.projectorX,
+    args.projectorY,
+    args.videos,
+    args.fps,
+    args.scaleToFit
+  );
+  if (result !== '') {
+    log(`Error: ${result}\n`);
+    return false;
+  }
+
+  // Create the preview channel and pass it and the module root to the control window
+  const channelName = eyeNative.createPreviewChannel();
+  if (controlWindow && controlWindow.webContents) {
+    controlWindow.webContents.send(
+      'runPreviewChannel',
+      eyeNativeModuleRoot,
+      channelName
+    );
+  }
+  return true;
+});
+
+/**
+ * The "cancelRun" IPC function will be called by the control window when the user
+ * wants to cancel the current run.
+ */
+ipcMain.on('cancelRun', (_event) => {
+  const result = eyeNative.endVideoPlayback();
+  if (result !== '') {
+    log(`Error terminating run: ${result}\n`);
+  } else {
+    log('Run terminated\n');
+  }
   runStopped();
 });
 

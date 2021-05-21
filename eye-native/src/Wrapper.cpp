@@ -15,6 +15,8 @@ Napi::Object wrapper::Init(Napi::Env env, Napi::Object exports)
   exports.Set("checkCompletedFrames", Napi::Function::New(env, wrapper::checkCompletedFrames));
   exports.Set("closeVideoOutput", Napi::Function::New(env, wrapper::closeVideoOutput));
 
+  exports.Set("beginVideoPlayback", Napi::Function::New(env, wrapper::beginVideoPlayback));
+  exports.Set("endVideoPlayback", Napi::Function::New(env, wrapper::endVideoPlayback));
   exports.Set("getDisplayFrequency", Napi::Function::New(env, wrapper::getDisplayFrequency));
 
   exports.Set("createPreviewChannel", Napi::Function::New(env, wrapper::createPreviewChannel));
@@ -93,6 +95,22 @@ void wrapper::closeVideoOutput(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
   native::closeVideoOutput(env);
+}
+
+Napi::String wrapper::beginVideoPlayback(const Napi::CallbackInfo& info)
+{
+  fprintf(stderr, "## wrapper::beginVideoPlayback()\n");
+  Napi::Env env = info.Env();
+  return Napi::String::New(env, "");
+  //return native.beginVideoPlayback(x, y, videos, fps, scaleToFit);
+}
+
+Napi::String wrapper::endVideoPlayback(const Napi::CallbackInfo& info)
+{
+  fprintf(stderr, "## wrapper::endVideoPlayback()\n");
+  Napi::Env env = info.Env();
+  return Napi::String::New(env, "");
+  //return native.endVideoPlayback();
 }
 
 Napi::Number wrapper::getDisplayFrequency(const Napi::CallbackInfo& info)

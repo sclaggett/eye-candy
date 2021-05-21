@@ -77,13 +77,23 @@ function closeVideoOutput() {
 
 /**
  * Use the functions in this section to create a full screen window on the projector,
- * play an existing video file to it, and close when finished. The helper function
- * allows us to get a monitor's display frequency.
+ * play a series of video file to it, and close when finished. The helper function
+ * getDisplayFrequency() allows us to get a monitor's display frequency.
  */
 
-// openVideoInput
-// readNextFrame
-// closeVideoInput
+function beginVideoPlayback(x, y, videos, fps, scaleToFit) {
+  if (native === null) {
+    throw new Error('Native module has not been initialized');
+  }
+  return native.beginVideoPlayback(x, y, videos, fps, scaleToFit);
+}
+
+function endVideoPlayback() {
+  if (native === null) {
+    throw new Error('Native module has not been initialized');
+  }
+  return native.endVideoPlayback();
+}
 
 function getDisplayFrequency(x, y) {
   if (native === null) {
@@ -136,6 +146,8 @@ module.exports = {
   queueNextFrame,
   checkCompletedFrames,
   closeVideoOutput,
+  beginVideoPlayback,
+  endVideoPlayback,
   getDisplayFrequency,
   createPreviewChannel,
   openPreviewChannel,

@@ -124,18 +124,21 @@ uint32_t native::getDisplayFrequency(Napi::Env env, int32_t x, int32_t y)
 
 string native::createPreviewChannel(Napi::Env env, string& channelName)
 {
+  // Temp: Disable the frame thread check while developing playback
   // Make sure the main thread is running
+  /*
   if (gFrameThread == nullptr)
   {
     return "Create video output before preview channel";
   }
+  */
 
   // Generate a unique pipe name and pass it to the frame thread
   if (!platform::generateUniquePipeName(channelName))
   {
     return "Failed to create uniquely named pipe";
   }
-  gFrameThread->setPreviewChannel(channelName);
+  //gFrameThread->setPreviewChannel(channelName);
   return "";
 }
 

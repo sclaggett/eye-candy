@@ -16,6 +16,8 @@ namespace wrapper
   Napi::Int32Array checkCompletedFrames(const Napi::CallbackInfo& info);
   void closeVideoOutput(const Napi::CallbackInfo& info);
 
+  Napi::String beginVideoPlayback(const Napi::CallbackInfo& info);
+  Napi::String endVideoPlayback(const Napi::CallbackInfo& info);
   Napi::Number getDisplayFrequency(const Napi::CallbackInfo& info);
 
   Napi::String createPreviewChannel(const Napi::CallbackInfo& info);

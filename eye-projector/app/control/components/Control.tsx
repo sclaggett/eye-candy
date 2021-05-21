@@ -3,12 +3,18 @@ import Modal from 'react-modal';
 import React from 'react';
 import { ReOrderableItem, ReOrderableList } from 'react-reorderable-list';
 import { ListGroup } from 'react-bootstrap';
+import fs from 'fs';
+import path from 'path';
 import ProjectorInfo from '../../shared/ProjectorInfo';
+import StartRun from '../../shared/StartRun';
 import * as styles from './Control.css';
 
 // Require the eye-native library but remember that we can't use it in a renderer
 // process until the main process notifies us of the module root
 const eyeNative = require('eye-native');
+
+// The starting fragment of the default root filename for all runs
+const defaultRootFilename = 'Run';
 
 // Give the modal library the name of this app's root div
 const rootDiv = document.getElementById('controlRoot');
@@ -38,6 +44,8 @@ type ControlState = {
 
   // Projector information relayed to us by the main process
   projDetected: boolean;
+  projX: number;
+  projY: number;
   projWidth: number;
   projHeight: number;
   projFps: number;
@@ -91,7 +99,7 @@ export default class Control extends React.Component<
       outputName: '',
       rootDirectory: '',
       ffmpegPath: initFfmpegPath,
-      projectorLatency: 0,
+      projectorLatency: 30, // Temp, should default to 0
       scaleToFit: false,
       videos: [],
       metadata: '',
@@ -148,28 +156,69 @@ export default class Control extends React.Component<
 
   /*
    * The componentDidMount() function is invoked when the component is mounted in the
-   * DOM and is a good spot to perform class initialization. Get the user's home
-   * directory from the main process and set the initial output directory. Enumerate
-   * the EPL programs in the resources directory and save them to the state so they
-   * can be rendered as options in the drop down list below.
+   * DOM and is a good spot to perform class initialization.
    */
   componentDidMount() {
     ipcRenderer
       .invoke('getHomeDirectory')
       .then((homeDirectory) => {
-        let initRootDirectory;
-        if (process.platform === 'win32') {
-          initRootDirectory = `${homeDirectory}\\Desktop\\EyeCandyData`;
-        } else {
-          initRootDirectory = `${homeDirectory}/Desktop/EyeCandyData`;
+        // Get the user's home directory from the main process and use it to format
+        // the default root directory.
+        const defaultRootDirectory = path.join(
+          homeDirectory,
+          'Desktop',
+          'EyeCandyData'
+        );
+
+        // Combine the root directory with today's date to determine the default output
+        // directory.
+        const date = new Date();
+        let month = `${date.getMonth() + 1}`;
+        if (month.length < 2) {
+          month = `0${month}`;
         }
+        let day = `${date.getDate()}`;
+        if (day.length < 2) {
+          day = `0${day}`;
+        }
+        const dateStr = [date.getFullYear(), month, day].join('-');
+        const defaultOutputDirectory = path.join(defaultRootDirectory, dateStr);
+
+        // Enumerate existing files to figure out what the number of the next run should be
+        let nextRunNumber = 1;
+        if (fs.existsSync(defaultOutputDirectory)) {
+          const fileList = fs.readdirSync(defaultOutputDirectory);
+          for (let i = 0; i < fileList.length; i += 1) {
+            const fileName = fileList[i];
+            if (fileName.startsWith(defaultRootFilename)) {
+              const fileNumber = parseInt(
+                fileName.substr(defaultRootFilename.length, 3),
+                10
+              );
+              if (!Number.isNaN(fileNumber) && fileNumber > nextRunNumber) {
+                nextRunNumber = fileNumber + 1;
+              }
+            }
+          }
+        }
+
+        // Format the output file name at update the state.
+        let outputFilename = defaultRootFilename;
+        if (nextRunNumber < 100) {
+          outputFilename += '0';
+        }
+        if (nextRunNumber < 10) {
+          outputFilename += '0';
+        }
+        outputFilename += nextRunNumber;
         this.setState({
-          rootDirectory: initRootDirectory,
+          outputName: path.join(defaultOutputDirectory, outputFilename),
+          rootDirectory: defaultRootDirectory,
         });
         return null;
       })
-      .catch(() => {
-        console.log('Failed to get home directory');
+      .catch((err) => {
+        alert(`Failed to get home directory: ${err}`);
         return null;
       });
     this.onProjectorRefresh();
@@ -265,6 +314,8 @@ export default class Control extends React.Component<
         if (projector) {
           this.setState({
             projDetected: true,
+            projX: projector.x,
+            projY: projector.y,
             projWidth: projector.width,
             projHeight: projector.height,
             projFps: projector.fps,
@@ -276,37 +327,29 @@ export default class Control extends React.Component<
         }
         return null;
       })
-      .catch(() => {
-        console.log('Failed to detect projector');
+      .catch((err) => {
+        alert(`Failed to detect projector: ${err}`);
         return null;
       });
   }
 
   /*
-   * The following two functions will be invoked when the user clicks the Compile/Start
-   * buttons or the Stop button. In both cases, the signals will be passed to the main
-   * process.
+   * The following two functions will be invoked when the user clicks the Start or Stop
+   * buttons. In both cases, the signals will be passed to the main process.
    */
   onStartButtonClick(event: React.MouseEvent<HTMLInputElement, MouseEvent>) {
-    console.log('## Start');
-    /*
-    // Create an instance of the StartProgram arguments
-    const args: StartProgram = new StartProgram();
-    args.rootDirectory = this.state.rootDirectory;
+    // Create an instance of the StartRun arguments
+    const args: StartRun = new StartRun();
     args.outputName = this.state.outputName;
     args.ffmpegPath = this.state.ffmpegPath;
-    args.seed = this.state.seed;
-    args.stampFrames = this.state.stampFrames;
-    args.saveStimuli = this.state.saveStimuli;
-    args.limitSeconds = this.state.limitSeconds;
-    args.width = this.state.width;
-    args.height = this.state.height;
+    args.projectorX = this.state.projX;
+    args.projectorY = this.state.projY;
+    args.projectorLatency = this.state.projectorLatency;
+    args.scaleToFit = this.state.scaleToFit;
+    args.videos = this.state.videos;
+    args.metadata = this.state.metadata;
     args.fps = this.state.fps;
-    args.programName = this.state.programName;
-    args.programText = this.state.programText.toString();
-    args.compileOnly =
-      event.target && (event.target as HTMLInputElement).value === 'Compile';
-    ipcRenderer.send('startProgram', JSON.stringify(args));
+    ipcRenderer.send('startRun', JSON.stringify(args));
 
     // Set the state to running so the UI will lock until the main process releases it
     this.setState(({
@@ -314,12 +357,10 @@ export default class Control extends React.Component<
       progress: 0,
       imageUrl: '',
     } as unknown) as ControlState);
-    */
   }
 
   onStopButtonClick() {
-    console.log('## Stop');
-    // ipcRenderer.send('cancelProgram');
+    ipcRenderer.send('cancelRun');
   }
 
   /*
@@ -377,7 +418,7 @@ export default class Control extends React.Component<
    */
   onPreviewInterval() {
     if (!this.previewContainer.current) {
-      console.log(`Missing preview container reference`);
+      alert(`Missing preview container reference`);
       return;
     }
     const ret = eyeNative.getNextFrame(
@@ -388,7 +429,7 @@ export default class Control extends React.Component<
       return;
     }
     if (!(ret instanceof Uint8Array)) {
-      console.log(
+      alert(
         `Preview frame is an unexpected data type: ${ret.constructor.name}`
       );
       return;
