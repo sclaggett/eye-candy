@@ -21,12 +21,12 @@ bool platform::spawnProcess(string executable, vector<string> arguments,
   HANDLE childStdoutRd = NULL, childStdoutWr = NULL;
   if (!CreatePipe(&childStdoutRd, &childStdoutWr, &saAttr, 0))
   {
-    printf("[Platform_Win] ERROR: Failed to create stdout pipes\n");
+    fprintf(stderr, "[Platform_Win] ERROR: Failed to create stdout pipes\n");
     return false;
   }
   if (!SetHandleInformation(childStdoutRd, HANDLE_FLAG_INHERIT, 0))
   {
-    printf("[Platform_Win] ERROR: Failed to set stdout pipe flag\n");
+    fprintf(stderr, "[Platform_Win] ERROR: Failed to set stdout pipe flag\n");
     return false;
   }
 
@@ -34,12 +34,12 @@ bool platform::spawnProcess(string executable, vector<string> arguments,
   HANDLE childStderrRd = NULL, childStderrWr = NULL;
   if (!CreatePipe(&childStderrRd, &childStderrWr, &saAttr, 0))
   {
-    printf("[Platform_Win] ERROR: Failed to create stderr pipes\n");
+    fprintf(stderr, "[Platform_Win] ERROR: Failed to create stderr pipes\n");
     return false;
   }
   if (!SetHandleInformation(childStderrRd, HANDLE_FLAG_INHERIT, 0))
   {
-    printf("[Platform_Win] ERROR: Failed to set stderr pipe flag\n");
+    fprintf(stderr, "[Platform_Win] ERROR: Failed to set stderr pipe flag\n");
     return false;
   }
   
@@ -47,12 +47,12 @@ bool platform::spawnProcess(string executable, vector<string> arguments,
   HANDLE childStdinRd = NULL, childStdinWr = NULL;
   if (!CreatePipe(&childStdinRd, &childStdinWr, &saAttr, 0))
   {
-    printf("[Platform_Win] ERROR: Failed to create stdin pipes\n");
+    fprintf(stderr, "[Platform_Win] ERROR: Failed to create stdin pipes\n");
     return false;
   }
   if (!SetHandleInformation(childStdinWr, HANDLE_FLAG_INHERIT, 0))
   {
-    printf("[Platform_Win] ERROR: Failed to set stdin pipe flag\n");
+    fprintf(stderr, "[Platform_Win] ERROR: Failed to set stdin pipe flag\n");
     return false;
   }
 
@@ -81,7 +81,7 @@ bool platform::spawnProcess(string executable, vector<string> arguments,
     &siStartInfo, &piProcInfo))
   {
     free(cmdLineStr);
-    printf("[Platform_Win] ERROR: Failed to create ffmpeg process\n");
+    fprintf(stderr, "[Platform_Win] ERROR: Failed to create ffmpeg process\n");
     return false;
   }
   free(cmdLineStr);
@@ -106,7 +106,7 @@ bool platform::isProcessRunning(uint64_t pid)
   DWORD exitCode = 0;
   if (!GetExitCodeProcess((HANDLE)pid, &exitCode))
   {
-    printf("[Platform_Win] ERROR: Failed to check if child process is running\n");
+    fprintf(stderr, "[Platform_Win] ERROR: Failed to check if child process is running\n");
     return false;
   }
   return (exitCode == STILL_ACTIVE);
@@ -165,7 +165,7 @@ bool platform::createNamedPipeForWriting(string channelName, uint64_t& pipeId,
     PIPE_TYPE_BYTE | PIPE_NOWAIT, 1, 0, 0, 0, NULL);
   if (pipe == INVALID_HANDLE_VALUE)
   {
-    printf("[Platform_Win] ERROR: Failed to create named pipe for writing (%i)\n", GetLastError());
+    fprintf(stderr, "[Platform_Win] ERROR: Failed to create named pipe for writing (%i)\n", GetLastError());
     return false;
   }
   pipeId = (uint64_t)pipe;
@@ -192,7 +192,7 @@ bool platform::openNamedPipeForWriting(uint64_t pipeId, bool& opened)
   }
   else
   {
-    printf("[Platform_Win] ERROR: Failed to open named pipe for writing (%i)\n", err);
+    fprintf(stderr, "[Platform_Win] ERROR: Failed to open named pipe for writing (%i)\n", err);
     return false;
   }
 }
@@ -213,7 +213,7 @@ bool platform::openNamedPipeForReading(string channelName, uint64_t& pipeId, boo
     fileNotFound = (GetLastError() == ERROR_FILE_NOT_FOUND);
     if (!fileNotFound)
     {
-      printf("[Platform_Win] ERROR: Failed to open named pipe for reading (%i)\n", GetLastError());
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to open named pipe for reading (%i)\n", GetLastError());
     }
     return false;
   }
@@ -241,7 +241,7 @@ int32_t platform::read(uint64_t file, uint8_t* buffer, uint32_t maxLength, bool&
     closed = (GetLastError() == ERROR_BROKEN_PIPE);
     if (!closed)
     {
-      printf("[Platform_Win] ERROR: Failed to read from file or pipe (%i)\n", GetLastError());
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to read from file or pipe (%i)\n", GetLastError());
     }
     return -1;
   }
@@ -253,7 +253,7 @@ int32_t platform::write(uint64_t file, const uint8_t* buffer, uint32_t length)
   DWORD dwWritten = 0;
   if (!WriteFile((HANDLE)file, buffer, length, &dwWritten, NULL))
   {
-    printf("[Platform_Win] ERROR: Failed to write to file or pipe (%i)\n", GetLastError());
+    fprintf(stderr, "[Platform_Win] ERROR: Failed to write to file or pipe (%i)\n", GetLastError());
     return -1;
   }
   return dwWritten;
@@ -262,4 +262,39 @@ int32_t platform::write(uint64_t file, const uint8_t* buffer, uint32_t length)
 void platform::close(uint64_t file)
 {
   CloseHandle((HANDLE)file);
+}
+
+uint32_t platform::getDisplayFrequency(int32_t x, int32_t y)
+{
+  // Get the monitor from the point
+  POINT pt;
+  pt.x = x;
+  pt.y = y;
+  HMONITOR hMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+  if (hMonitor == NULL)
+  {
+    fprintf(stderr, "[Platform_Win] ERROR: Failed to find monitor from point (%i, %i)\n", x, y);
+    return 0;
+  }
+
+  // Look up the device name of the monitor
+  MONITORINFOEX monitorInfo;
+  memset(&monitorInfo, 0, sizeof(MONITORINFOEX));
+  monitorInfo.cbSize = sizeof(MONITORINFOEX);
+  if (!GetMonitorInfoA(hMonitor, &monitorInfo))
+  {
+    fprintf(stderr, "[Platform_Win] ERROR: Failed to get monitor info\n");
+    return 0;
+  }
+
+  // Get the display frequency
+  DEVMODE devMode;
+  memset(&devMode, 0, sizeof(DEVMODE));
+  devMode.dmSize = sizeof(DEVMODE);
+  if (!EnumDisplaySettings(monitorInfo.szDevice, ENUM_CURRENT_SETTINGS, &devMode))
+  {
+    fprintf(stderr, "[Platform_Win] ERROR: Failed to enumeate display settings\n");
+    return 0;
+  }
+  return devMode.dmDisplayFrequency;
 }

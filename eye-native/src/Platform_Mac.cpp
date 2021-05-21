@@ -31,7 +31,7 @@ bool platform::spawnProcess(string executable, vector<string> arguments,
   int stdinPipe[2], stdoutPipe[2], stderrPipe[2];
   if ((pipe(stdinPipe) < 0) || (pipe(stdoutPipe) < 0) || (pipe(stderrPipe) < 0))
   {
-    printf("ERROR: Failed to allocate pipes\n");
+    fprintf(stderr, "ERROR: Failed to allocate pipes\n");
     return false;
   }
   int forkResult = fork();
@@ -114,7 +114,7 @@ bool platform::isProcessRunning(uint64_t pid)
   }
   else
   {
-    printf("ERROR: Failed to check if child process is running\n");
+    fprintf(stderr, "ERROR: Failed to check if child process is running\n");
     return false;
   }
 }

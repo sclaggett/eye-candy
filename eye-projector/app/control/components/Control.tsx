@@ -240,7 +240,6 @@ export default class Control extends React.Component<
       id,
       path: selectedVideo,
     };
-    console.log(`## Adding video object: ${JSON.stringify(videoObject)}`);
     this.setState((prevState) => ({
       videos: [...prevState.videos, videoObject],
     }));
@@ -248,7 +247,6 @@ export default class Control extends React.Component<
 
   onRemoveVideo(event) {
     const { id } = event.target;
-    console.log(`## Removing video ID: ${id}`);
     this.setState((prevState) => ({
       videos: prevState.videos.filter(function (e) {
         return e.id !== id;

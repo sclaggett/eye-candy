@@ -213,7 +213,6 @@ ipcMain.handle('detectProjector', async (_event: Event) => {
     return display.bounds.x !== 0 || display.bounds.y !== 0;
   });
   if (projector) {
-    console.log(`## Projector: ${JSON.stringify(projector)}`);
     const projInfo: ProjectorInfo = new ProjectorInfo();
     projInfo.width = projector.bounds.width;
     projInfo.height = projector.bounds.height;
@@ -221,7 +220,6 @@ ipcMain.handle('detectProjector', async (_event: Event) => {
       projector.bounds.x + projector.bounds.width / 2,
       projector.bounds.y + projector.bounds.height / 2
     );
-    console.log(`## Projector info: ${projInfo}`);
     return projInfo;
   }
   return null;

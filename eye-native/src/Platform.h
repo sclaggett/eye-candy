@@ -30,4 +30,6 @@ namespace platform
   int32_t read(uint64_t file, uint8_t* buffer, uint32_t maxLength, bool& closed);
   int32_t write(uint64_t file, const uint8_t* buffer, uint32_t length);
   void close(uint64_t file);
+
+  uint32_t getDisplayFrequency(int32_t x, int32_t y);
 }
