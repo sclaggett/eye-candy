@@ -5,11 +5,11 @@
 #include "Thread.h"
 #include "Queue.hpp"
 
-class PreviewThread : public Thread
+class PreviewReceiveThread : public Thread
 {
 public:
-  PreviewThread(std::string channelName, std::shared_ptr<Queue<cv::Mat*>> previewQueue);
-  virtual ~PreviewThread() {};
+  PreviewReceiveThread(std::string channelName, std::shared_ptr<Queue<cv::Mat*>> previewQueue);
+  virtual ~PreviewReceiveThread() {};
 
   uint32_t run();
 

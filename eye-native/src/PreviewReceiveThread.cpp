@@ -1,18 +1,18 @@
-#include "PreviewThread.h"
+#include "PreviewReceiveThread.h"
 #include "FrameHeader.h"
 #include "Platform.h"
 
 using namespace std;
 using namespace cv;
 
-PreviewThread::PreviewThread(string name, shared_ptr<Queue<cv::Mat*>> queue) :
-  Thread("preview"),
+PreviewReceiveThread::PreviewReceiveThread(string name, shared_ptr<Queue<cv::Mat*>> queue) :
+  Thread("previewreceive"),
   channelName(name),
   previewQueue(queue)
 {
 }
 
-uint32_t PreviewThread::run()
+uint32_t PreviewReceiveThread::run()
 {
   // Open the named pipe for reading. It's not unusual for this process to start
   // before the frame thread has created the named pipe so wait a few seconds.
@@ -30,14 +30,14 @@ uint32_t PreviewThread::run()
       }
       else
       {
-        printf("[PreviewThread] ERROR: Failed to open named pipe (1)\n");
+        printf("[PreviewReceiveThread] ERROR: Failed to open named pipe (1)\n");
         return 1;
       }
     }
   }
   if (namedPipeId == 0)
   {
-    printf("[PreviewThread] ERROR: Failed to open named pipe (2)\n");
+    printf("[PreviewReceiveThread] ERROR: Failed to open named pipe (2)\n");
     return 1;
   }
 
@@ -55,12 +55,12 @@ uint32_t PreviewThread::run()
       {
         break;
       }
-      printf("[PreviewThread] ERROR: Failed to read header from named pipe\n");
+      printf("[PreviewReceiveThread] ERROR: Failed to read header from named pipe\n");
       return 1;
     }
     if (!frameheader::parse(frameHeader, number, width, height, length))
     {
-      printf("[PreviewThread] ERROR: Failed to parse frame header\n");
+      printf("[PreviewReceiveThread] ERROR: Failed to parse frame header\n");
       return 1;
     }
 
@@ -80,7 +80,7 @@ uint32_t PreviewThread::run()
       {
         break;
       }
-      printf("[PreviewThread] ERROR: Failed to read frame from named pipe\n");
+      printf("[PreviewReceiveThread] ERROR: Failed to read frame from named pipe\n");
       return 1;
     }
 
@@ -95,7 +95,7 @@ uint32_t PreviewThread::run()
   return 0;
 }
 
-bool PreviewThread::readAll(uint64_t file, uint8_t* buffer, uint32_t length, bool& closed)
+bool PreviewReceiveThread::readAll(uint64_t file, uint8_t* buffer, uint32_t length, bool& closed)
 {
   uint32_t bytesRead = 0;
   while (bytesRead < length)
