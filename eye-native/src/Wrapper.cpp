@@ -1,6 +1,5 @@
 #include "Wrapper.h"
 #include "FfmpegProcess.h"
-#include "FrameThread.h"
 #include "Native.h"
 #include <stdio.h>
 
@@ -99,18 +98,36 @@ void wrapper::closeVideoOutput(const Napi::CallbackInfo& info)
 
 Napi::String wrapper::beginVideoPlayback(const Napi::CallbackInfo& info)
 {
-  fprintf(stderr, "## wrapper::beginVideoPlayback()\n");
   Napi::Env env = info.Env();
-  return Napi::String::New(env, "");
-  //return native.beginVideoPlayback(x, y, videos, fps, scaleToFit);
+  if ((info.Length() != 5) ||
+    !info[0].IsNumber() ||
+    !info[1].IsNumber() ||
+    !info[2].IsArray() ||
+    !info[3].IsNumber() ||
+    !info[4].IsBoolean())
+  {
+    Napi::TypeError::New(env, "Incorrect parameter type").ThrowAsJavaScriptException();
+    return Napi::String();
+  }
+  Napi::Number x = info[0].As<Napi::Number>();
+  Napi::Number y = info[1].As<Napi::Number>();
+  Napi::Array videosArray = info[2].As<Napi::Array>();
+  vector<string> videos;
+  for (uint32_t i = 0; i < videosArray.Length(); i++)
+  {
+    Napi::Value value = videosArray[i];
+    string video = value.ToString().Utf8Value();
+    videos.push_back(video);
+  }
+  Napi::Number fps = info[3].As<Napi::Number>();
+  bool scaleToFit = info[4].As<Napi::Boolean>();
+  return Napi::String::New(env, native::beginVideoPlayback(env, x, y, videos, fps, scaleToFit));
 }
 
 Napi::String wrapper::endVideoPlayback(const Napi::CallbackInfo& info)
 {
-  fprintf(stderr, "## wrapper::endVideoPlayback()\n");
   Napi::Env env = info.Env();
-  return Napi::String::New(env, "");
-  //return native.endVideoPlayback();
+  return Napi::String::New(env, native::endVideoPlayback(env));
 }
 
 Napi::Number wrapper::getDisplayFrequency(const Napi::CallbackInfo& info)

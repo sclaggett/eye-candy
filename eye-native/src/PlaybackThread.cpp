@@ -1,4 +1,4 @@
-#include "FrameThread.h"
+#include "RecordThread.h"
 #include "FrameHeader.h"
 #include "Platform.h"
 #include <opencv2/core/core.hpp>
@@ -14,20 +14,27 @@ using namespace cv;
 #define CHANNEL_OPEN 2
 #define CHANNEL_ERROR 3
 
-FrameThread::FrameThread(shared_ptr<FfmpegProcess> process,
-    shared_ptr<Queue<FrameWrapper*>> pendingQueue,
-    shared_ptr<Queue<FrameWrapper*>> completedQueue, uint32_t wid, uint32_t hgt) :
-  Thread("frame"),
-  ffmpegProcess(process),
+RecordThread::RecordThread(shared_ptr<Queue<FrameWrapper*>> pendingQueue,
+    shared_ptr<Queue<FrameWrapper*>> completedQueue, string ffmpeg, uint32_t wid,
+    uint32_t hgt, uint32_t f, string output) :
+  Thread("record"),
   pendingFrameQueue(pendingQueue),
   completedFrameQueue(completedQueue),
+  ffmpegPath(ffmpeg),
   width(wid),
-  height(hgt)
+  height(hgt),
+  fps(f),
+  outputPath(output)
 {
 }
 
-uint32_t FrameThread::run()
+uint32_t RecordThread::run()
 {
+  // Spawn the ffmpeg process
+  shared_ptr<FfmpegProcess> ffmpegProcess = shared_ptr<FfmpegProcess>(new FfmpegProcess(
+    ffmpegPath, width, height, fps, outputPath));
+  ffmpegProcess->spawn();
+
   uint32_t frameNumber = 0;
   uint32_t channelState = CHANNEL_CLOSED;
   uint64_t namedPipeId = 0;
@@ -111,7 +118,11 @@ uint32_t FrameThread::run()
     frameNumber += 1;
   }
 
-  // Close the preview channel
+  // Stop ffmpeg and close the preview channel
+  if (ffmpegProcess->isProcessRunning())
+  {
+    ffmpegProcess->waitForExit();
+  }
   if (channelState != CHANNEL_CLOSED)
   {
     platform::closeNamedPipeForWriting(previewChannelName, namedPipeId);
@@ -119,13 +130,13 @@ uint32_t FrameThread::run()
   return 0;
 }
 
-void FrameThread::setPreviewChannel(string channelName)
+void RecordThread::setPreviewChannel(string channelName)
 {
   unique_lock<mutex> lock(previewChannelMutex);
   previewChannelName = channelName;
 }
 
-bool FrameThread::writeAll(uint64_t file, const uint8_t* buffer, uint32_t length)
+bool RecordThread::writeAll(uint64_t file, const uint8_t* buffer, uint32_t length)
 {
   uint32_t bytesWritten = 0;
   while (bytesWritten < length)

@@ -346,7 +346,9 @@ export default class Control extends React.Component<
     args.projectorY = this.state.projY;
     args.projectorLatency = this.state.projectorLatency;
     args.scaleToFit = this.state.scaleToFit;
-    args.videos = this.state.videos;
+    args.videos = this.state.videos.map((video) => {
+      return video.path;
+    });
     args.metadata = this.state.metadata;
     args.fps = this.state.fps;
     ipcRenderer.send('startRun', JSON.stringify(args));

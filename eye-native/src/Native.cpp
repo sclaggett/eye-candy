@@ -1,8 +1,9 @@
 #include "Native.h"
 #include "FfmpegProcess.h"
-#include "FrameThread.h"
 #include "Platform.h"
+#include "PlaybackThread.h"
 #include "PreviewThread.h"
+#include "RecordThread.h"
 #include "Wrapper.h"
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -13,12 +14,14 @@ using namespace cv;
 
 // Global variables
 string gFfmpegPath;
-bool gInitialized = false, gRecording = false;
+bool gInitialized = false, gRecording = false, gPlaying = false;
 uint32_t gNextFrameId = 0;
-shared_ptr<Queue<FrameWrapper*>> gPendingFrameQueue(new Queue<FrameWrapper*>());
-shared_ptr<Queue<FrameWrapper*>> gCompletedFrameQueue(new Queue<FrameWrapper*>());
-shared_ptr<FfmpegProcess> gFfmpegProcess(nullptr);
-shared_ptr<FrameThread> gFrameThread(nullptr);
+shared_ptr<Queue<FrameWrapper*>> gRecordPendingQueue(new Queue<FrameWrapper*>());
+shared_ptr<Queue<FrameWrapper*>> gRecordCompletedQueue(new Queue<FrameWrapper*>());
+shared_ptr<RecordThread> gRecordThread(nullptr);
+shared_ptr<Queue<FrameWrapper*>> gPlaybackQueue(new Queue<FrameWrapper*>());
+shared_ptr<PlaybackThread> gPlaybackThread(nullptr);
+//shared_ptr<ProjectorThread> gProjectorThread(nullptr);
 shared_ptr<Queue<Mat*>> gPreviewFrameQueue(new Queue<Mat*>());
 shared_ptr<PreviewThread> gPreviewThread(nullptr);
 
@@ -41,15 +44,11 @@ string native::createVideoOutput(Napi::Env env, int width, int height, int fps, 
     return "Recording already in progress";
   }
 
-  // Spawn the ffmpeg process
-  gFfmpegProcess = shared_ptr<FfmpegProcess>(new FfmpegProcess(gFfmpegPath, width, height,
-    fps, outputPath));
-  gFfmpegProcess->spawn();
-
-  // Spawn the thread that will feed frames to the ffmpeg process
-  gFrameThread = shared_ptr<FrameThread>(new FrameThread(gFfmpegProcess, gPendingFrameQueue,
-    gCompletedFrameQueue, width, height));
-  gFrameThread->spawn();
+  // Spawn the recording thread that will create the ffmpeg process and feed it frames as
+  // they arrive in the queue
+  gRecordThread = shared_ptr<RecordThread>(new RecordThread(gRecordPendingQueue,
+    gRecordCompletedQueue, gFfmpegPath, width, height, fps, outputPath));
+  gRecordThread->spawn();
 
   gRecording = true;
   return "";
@@ -75,7 +74,7 @@ int32_t native::queueNextFrame(Napi::Env env, uint8_t* frame, size_t length, int
   wrapper->width = width;
   wrapper->height = height;
   wrapper->id = gNextFrameId++;
-  gPendingFrameQueue->addItem(wrapper);
+  gRecordPendingQueue->addItem(wrapper);
   return wrapper->id;
 }
 
@@ -84,7 +83,7 @@ vector<int32_t> native::checkCompletedFrames(Napi::Env env)
   // Return an array of all frames that we're done with and free the associated memory
   vector<int32_t> ret;
   FrameWrapper* wrapper;
-  while (gCompletedFrameQueue->waitItem(&wrapper, 0))
+  while (gRecordCompletedQueue->waitItem(&wrapper, 0))
   {
     ret.push_back(wrapper->id);
     delete wrapper;
@@ -98,23 +97,52 @@ void native::closeVideoOutput(Napi::Env env)
   {
     return;
   }
-  if (gFrameThread != nullptr)
+  if (gRecordThread != nullptr)
   {
-    if (gFrameThread->isRunning())
+    if (gRecordThread->isRunning())
     {
-      gFrameThread->terminate();
+      gRecordThread->terminate();
     }
-    gFrameThread = nullptr;
-  }
-  if (gFfmpegProcess != nullptr)
-  {
-    if (gFfmpegProcess->isProcessRunning())
-    {
-      gFfmpegProcess->waitForExit();
-    }
-    gFfmpegProcess = nullptr;
+    gRecordThread = nullptr;
   }
   gRecording = false;
+}
+
+string native::beginVideoPlayback(Napi::Env env, int32_t x, int32_t y,
+  vector<string> videos, uint32_t fps, bool scaleToFit)
+{
+  // Make sure we've been initialized and aren't currently playing
+  if (!gInitialized)
+  {
+    return "Library has not been initialized";
+  }
+  if (gPlaying)
+  {
+    return "Playback already in progress";
+  }
+
+  // Spawn the projector thread that will take the frames in the playback queue
+  // and display they in sync with the monitor's vertical refresh
+  /*
+  gProjectorThread = shared_ptr<ProjectorThread>(new ProjectorThread(x, y,
+    fps, scaleToFit, gPlaybackThread);
+  gProjectorThread->spawn();
+  */
+
+  // Spawn the playback thread that will create the ffmpeg processes, read the
+  // frames as they are decoded, and store then in the playback queue
+  gPlaybackThread = shared_ptr<PlaybackThread>(new PlaybackThread(videos,
+    gPlaybackQueue));
+  gPlaybackThread->spawn();
+
+  gPlaying = true;
+  return "";
+}
+
+string native::endVideoPlayback(Napi::Env env)
+{
+  fprintf(stderr, "## native::endVideoPlayback\n");
+  return "";
 }
 
 uint32_t native::getDisplayFrequency(Napi::Env env, int32_t x, int32_t y)
@@ -127,7 +155,7 @@ string native::createPreviewChannel(Napi::Env env, string& channelName)
   // Temp: Disable the frame thread check while developing playback
   // Make sure the main thread is running
   /*
-  if (gFrameThread == nullptr)
+  if (gRecordThread == nullptr)
   {
     return "Create video output before preview channel";
   }
@@ -138,7 +166,7 @@ string native::createPreviewChannel(Napi::Env env, string& channelName)
   {
     return "Failed to create uniquely named pipe";
   }
-  //gFrameThread->setPreviewChannel(channelName);
+  //gRecordThread->setPreviewChannel(channelName);
   return "";
 }
 
