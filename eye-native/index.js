@@ -32,13 +32,13 @@ function setModuleRoot(moduleRoot) {
 
 /**
  * The initializeFfmpeg() function should be called before any of the video-related
- * functions below to set the location of the FFmpeg executable.
+ * functions below to set the location of the ffmpeg and ffprobe executables.
  */
-function initializeFfmpeg(ffmpegPath) {
+function initializeFfmpeg(ffmpegPath, ffprobePath) {
   if (native === null) {
     throw new Error('Native module has not been initialized');
   }
-  native.initializeFfmpeg(ffmpegPath);
+  native.initializeFfmpeg(ffmpegPath, ffprobePath);
 }
 
 /**

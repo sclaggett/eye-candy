@@ -354,9 +354,19 @@ ipcMain.on('startRun', (_event, stringArg: string) => {
   }
   log(`Detected version ${version}\n`);
 
+  // Calculate the location of ffprobe under the assumption that it is located in the
+  // same directory as ffmpeg
+  let ffprobeName;
+  if (process.platform === 'win32') {
+    ffprobeName = 'ffprobe.exe';
+  } else {
+    ffprobeName = 'ffprobe';
+  }
+  const ffprobePath = path.join(path.parse(args.ffmpegPath).dir, ffprobeName);
+
   // Initialize the native library with the location of ffmpeg and start playing back
   // the list of video files
-  eyeNative.initializeFfmpeg(args.ffmpegPath);
+  eyeNative.initializeFfmpeg(args.ffmpegPath, ffprobePath);
   result = eyeNative.beginVideoPlayback(
     args.projectorX,
     args.projectorY,

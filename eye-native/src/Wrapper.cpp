@@ -28,13 +28,16 @@ Napi::Object wrapper::Init(Napi::Env env, Napi::Object exports)
 void wrapper::initializeFfmpeg(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
-  if ((info.Length() != 1) || !info[0].IsString())
+  if ((info.Length() != 2) ||
+    !info[0].IsString() ||
+    !info[1].IsString())
   {
     Napi::TypeError::New(env, "Incorrect parameter type").ThrowAsJavaScriptException();
     return;
   }
   Napi::String ffmpegPath = info[0].As<Napi::String>();  
-  native::initializeFfmpeg(env, ffmpegPath);
+  Napi::String ffprobePath = info[1].As<Napi::String>();  
+  native::initializeFfmpeg(env, ffmpegPath, ffprobePath);
 }
 
 Napi::String wrapper::createVideoOutput(const Napi::CallbackInfo& info)

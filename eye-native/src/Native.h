@@ -6,7 +6,8 @@
 
 namespace native
 {
-  void initializeFfmpeg(Napi::Env env, std::string ffmpegPath);
+  void initializeFfmpeg(Napi::Env env, std::string ffmpegPath,
+    std::string ffprobePath);
 
   std::string createVideoOutput(Napi::Env env, int width, int height, int fps,
     std::string outputPath);

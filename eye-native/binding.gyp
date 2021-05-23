@@ -5,6 +5,7 @@
     "cflags_cc!": [ "-fno-exceptions" ],
     "sources": [
       "src/FfmpegProcess.cpp",
+      "src/FfprobeProcess.cpp",
       "src/FrameHeader.cpp",
       "src/main.cpp",
       "src/Native.cpp",

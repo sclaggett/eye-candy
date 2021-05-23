@@ -608,6 +608,19 @@ function checkFFmpeg() {
   return true;
 }
 function spawnFFmpeg() {
+  // Calculate the location of ffprobe under the assumption that it is located in the
+  // same directory as ffmpeg
+  let ffprobeName;
+  if (process.platform === 'win32') {
+    ffprobeName = 'ffprobe.exe';
+  } else {
+    ffprobeName = 'ffprobe';
+  }
+  const ffprobePath = path.join(
+    path.parse(videoInfo.ffmpegPath).dir,
+    ffprobeName
+  );
+
   // Initialize the native library with the location of ffmpeg and open the output
   // file for writing
   if (videoInfo === null) {

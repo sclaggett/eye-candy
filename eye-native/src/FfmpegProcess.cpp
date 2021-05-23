@@ -43,6 +43,8 @@ FfmpegProcess::FfmpegProcess(string exec, uint32_t width, uint32_t height, uint3
 
   arguments.push_back("-y");
   
+  //ffmpeg -i video.mp4 -c:v rawvideo -pix_fmt yuv420p out.yuv
+
   arguments.push_back(outputPath);
 }
 
@@ -58,7 +60,7 @@ uint32_t FfmpegProcess::run()
     processStderr));
   if (!stdoutReader->spawn() || !stderrReader->spawn())
   {
-    printf("[FfmpegProcess] ERROR: Failed to spawn reader threads\n");
+    fprintf(stderr, "[FfmpegProcess] ERROR: Failed to spawn reader threads\n");
     return 1;
   }
   processMutex.lock();
@@ -70,7 +72,7 @@ uint32_t FfmpegProcess::run()
     if (!stdoutReader->isRunning() ||
       !stderrReader->isRunning())
     {
-      printf("[FfmpegProcess] ERROR: A process thread has exited unexpectedly\n");
+      fprintf(stderr, "[FfmpegProcess] ERROR: A process thread has exited unexpectedly\n");
       break;
     }
     if (checkForExit())
@@ -85,7 +87,7 @@ uint32_t FfmpegProcess::run()
       vector<string> lines = splitString(data, "\n");
       for (auto it = lines.begin(); it != lines.end(); ++it)
       {
-        printf("[ffmpeg.stdout] %s\n", (*it).c_str());
+        fprintf(stderr, "[ffmpeg.stdout] %s\n", (*it).c_str());
       }
     }
     data = stderrReader->getData();
@@ -94,7 +96,7 @@ uint32_t FfmpegProcess::run()
       vector<string> lines = splitString(data, "\n");
       for (auto it = lines.begin(); it != lines.end(); ++it)
       {
-        printf("[ffmpeg.stderr] %s\n", (*it).c_str());
+        fprintf(stderr, "[ffmpeg.stderr] %s\n", (*it).c_str());
       }
     }
   }

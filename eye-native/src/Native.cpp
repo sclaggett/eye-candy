@@ -15,7 +15,7 @@ using namespace std;
 using namespace cv;
 
 // Global variables
-string gFfmpegPath;
+string gFfmpegPath, gFfprobePath;
 bool gInitialized = false, gRecording = false, gPlaying = false;
 uint32_t gNextFrameId = 0, gWidth = 0, gHeight = 0;
 shared_ptr<Queue<FrameWrapper*>> gPendingFrameQueue(new Queue<FrameWrapper*>());
@@ -28,10 +28,11 @@ shared_ptr<ProjectorThread> gProjectorThread(nullptr);
 shared_ptr<PreviewSendThread> gPreviewSendThread(nullptr);
 shared_ptr<PreviewReceiveThread> gPreviewReceiveThread(nullptr);
 
-void native::initializeFfmpeg(Napi::Env env, string ffmpegPath)
+void native::initializeFfmpeg(Napi::Env env, string ffmpegPath, string ffprobePath)
 {
-  // Remember the location of ffmpeg
+  // Remember the location of ffmpeg and ffprobe
   gFfmpegPath = ffmpegPath;
+  gFfprobePath = ffprobePath;
   gInitialized = true;
 }
 
@@ -161,7 +162,7 @@ string native::beginVideoPlayback(Napi::Env env, int32_t x, int32_t y,
   // Spawn the playback thread that will create the ffmpeg processes, read the
   // frames as they are decoded, and store then in the pending frames queue
   gPlaybackThread = shared_ptr<PlaybackThread>(new PlaybackThread(videos,
-    gPendingFrameQueue, gFfmpegPath));
+    gPendingFrameQueue, gFfmpegPath, gFfprobePath));
   gPlaybackThread->spawn();
 
   // Spawn the projector thread that will take the frames in the pending frames
