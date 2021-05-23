@@ -22,6 +22,16 @@
 
 <img src="images/EyeCandy4.png" width="70%" />
 
+**Native integration.** The native C++ module is used to pass each frame to the *ffmpeg* process and optionally send a copy to the renderer process. Each frame that is captured by the main process is passed to the native layer by calling *queueNextFrame()*. A reference to the JavaScript object is retained in the *pendingFrames* array so the data remains valid until the native code has finished.
+
+Frames are processed sequentially by the *RecordThread* and *PreviewSendThread*, with the former spawning an instance of *ffmpeg* and passing each frame to it as raw pixel data and the latter transmiting a copy of the frame to the renderer process via a named pipe if a connection has been established.
+
+<img src="images/EyeNative1.png" width="70%" />
+
+The control window has its own instance of the native code and uses it to receive frames from the main process via the named pipe. This approach is far more efficient than burdening the main process with the task of transferring the video data between the main and renderer processes.
+
+<img src="images/EyeNative3.png" width="70%" />
+
 ## EyeProjector program flow
 
 **Step 1.** The main electron process creates the control window which allows the user to select the video files that will be played during the experiment.
@@ -35,3 +45,13 @@
 **Step 3.** The *ffmpeg* process decodes each video into a series of frames which are passed to the stimulus window for projection and the control window for preview.
 
 <img src="images/EyeProjector3.png" width="70%" />
+
+**Native integration.** The video decoding and playback pipeline exists in the native layer and is composed of the *PlaybackThread*, *ProjectorThread*, and *PreviewSendThread*.
+
+The *PlaybackThread* handles spawning an *ffmpeg* process for each video in the list and capturing each frame as raw pixel data. It plays back the video as fast as it can but pauses when the *pendingFrameQueue* gets too full.
+
+The *ProjectorThread* displays each frame on the projector at the desired frame rate and in sync with the vertical refresh signal. It should be the rate-limiting step in the pipeline.
+
+Finally, the *PreviewSendThread* transmits a copy of the recently played frame to the control window for display to the user as described above.
+
+<img src="images/EyeNative2.png" width="70%" />
