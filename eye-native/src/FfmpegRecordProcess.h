@@ -7,12 +7,12 @@
 #include "PipeReader.h"
 #include "Thread.h"
 
-class FfmpegProcess : public Thread
+class FfmpegRecordProcess : public Thread
 {
 public:
-  FfmpegProcess(std::string executable, uint32_t width, uint32_t height, uint32_t fps,
+  FfmpegRecordProcess(std::string executable, uint32_t width, uint32_t height, uint32_t fps,
     std::string outputPath);
-  virtual ~FfmpegProcess() {};
+  virtual ~FfmpegRecordProcess() {};
 
 public:
   bool isProcessRunning();

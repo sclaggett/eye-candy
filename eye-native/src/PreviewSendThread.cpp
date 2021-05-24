@@ -95,8 +95,20 @@ uint32_t PreviewSendThread::run()
       }
     }
     
-    // Add the frame to the output queue
-    outputFrameQueue->addItem(wrapper);
+    // Add the frame to the output queue or release the memory
+    if (outputFrameQueue != 0)
+    {
+      outputFrameQueue->addItem(wrapper);
+    }
+    else
+    {
+      if (wrapper->nativeFrame != 0)
+      {
+        delete [] wrapper->nativeFrame;
+        wrapper->nativeFrame = 0;
+      }
+      delete wrapper;
+    }
     frameNumber += 1;
   }
 

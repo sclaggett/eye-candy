@@ -15,8 +15,6 @@ export default class StartRun {
 
   metadata: string;
 
-  fps: number;
-
   constructor() {
     this.outputName = '';
     this.ffmpegPath = '';
@@ -26,6 +24,5 @@ export default class StartRun {
     this.scaleToFit = false;
     this.videos = [];
     this.metadata = '';
-    this.fps = 0;
   }
 }

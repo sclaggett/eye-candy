@@ -1,12 +1,10 @@
 #include "Native.h"
-#include "FfmpegProcess.h"
 #include "Platform.h"
 #include "PlaybackThread.h"
 #include "PreviewReceiveThread.h"
 #include "PreviewSendThread.h"
 #include "ProjectorThread.h"
 #include "RecordThread.h"
-#include "Wrapper.h"
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <stdio.h>
@@ -16,6 +14,7 @@ using namespace cv;
 
 // Global variables
 string gFfmpegPath, gFfprobePath;
+wrapper::JsCallback* gLogCallback = 0;
 bool gInitialized = false, gRecording = false, gPlaying = false;
 uint32_t gNextFrameId = 0, gWidth = 0, gHeight = 0;
 shared_ptr<Queue<FrameWrapper*>> gPendingFrameQueue(new Queue<FrameWrapper*>());
@@ -28,11 +27,13 @@ shared_ptr<ProjectorThread> gProjectorThread(nullptr);
 shared_ptr<PreviewSendThread> gPreviewSendThread(nullptr);
 shared_ptr<PreviewReceiveThread> gPreviewReceiveThread(nullptr);
 
-void native::initializeFfmpeg(Napi::Env env, string ffmpegPath, string ffprobePath)
+void native::initialize(Napi::Env env, string ffmpegPath, string ffprobePath,
+  wrapper::JsCallback* logCallback)
 {
-  // Remember the location of ffmpeg and ffprobe
+  // Remember the location of ffmpeg and ffprobe and the log callback
   gFfmpegPath = ffmpegPath;
   gFfprobePath = ffprobePath;
+  gLogCallback = logCallback;
   gInitialized = true;
 }
 
@@ -147,7 +148,7 @@ void native::closeVideoOutput(Napi::Env env)
 }
 
 string native::beginVideoPlayback(Napi::Env env, int32_t x, int32_t y,
-  vector<string> videos, uint32_t fps, bool scaleToFit)
+  vector<string> videos, bool scaleToFit)
 {
   // Make sure we've been initialized and aren't currently playing
   if (!gInitialized)
@@ -162,14 +163,14 @@ string native::beginVideoPlayback(Napi::Env env, int32_t x, int32_t y,
   // Spawn the playback thread that will create the ffmpeg processes, read the
   // frames as they are decoded, and store then in the pending frames queue
   gPlaybackThread = shared_ptr<PlaybackThread>(new PlaybackThread(videos,
-    gPendingFrameQueue, gFfmpegPath, gFfprobePath));
+    gPendingFrameQueue, gFfmpegPath, gFfprobePath, gLogCallback));
   gPlaybackThread->spawn();
 
   // Spawn the projector thread that will take the frames in the pending frames
   // queue, display they in sync with the monitor's vertical refresh, and move
   // them on to the preview frames queue
   gProjectorThread = shared_ptr<ProjectorThread>(new ProjectorThread(x, y,
-    fps, scaleToFit, gPendingFrameQueue, gPreviewFrameQueue));
+    scaleToFit, gPendingFrameQueue, gPreviewFrameQueue));
   gProjectorThread->spawn();
 
   // Spawn the preview send thread that will transmit the frames from the preview

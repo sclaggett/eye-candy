@@ -3,11 +3,12 @@
 
 #include <napi.h>
 #include <vector>
+#include "Wrapper.h"
 
 namespace native
 {
-  void initializeFfmpeg(Napi::Env env, std::string ffmpegPath,
-    std::string ffprobePath);
+  void initialize(Napi::Env env, std::string ffmpegPath,
+    std::string ffprobePath, wrapper::JsCallback* logCallback);
 
   std::string createVideoOutput(Napi::Env env, int width, int height, int fps,
     std::string outputPath);
@@ -17,7 +18,7 @@ namespace native
   void closeVideoOutput(Napi::Env env);
 
   std::string beginVideoPlayback(Napi::Env env, int32_t x, int32_t y,
-    std::vector<std::string> videos, uint32_t fps, bool scaleToFit);
+    std::vector<std::string> videos, bool scaleToFit);
   std::string endVideoPlayback(Napi::Env env);
   uint32_t getDisplayFrequency(Napi::Env env, int32_t x, int32_t y);
 

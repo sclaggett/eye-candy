@@ -1,4 +1,5 @@
 #include "RecordThread.h"
+#include "FfmpegRecordProcess.h"
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -23,8 +24,8 @@ RecordThread::RecordThread(shared_ptr<Queue<FrameWrapper*>> inputQueue,
 uint32_t RecordThread::run()
 {
   // Spawn the ffmpeg process
-  shared_ptr<FfmpegProcess> ffmpegProcess = shared_ptr<FfmpegProcess>(new FfmpegProcess(
-    ffmpegPath, width, height, fps, outputPath));
+  FfmpegRecordProcess* ffmpegProcess = new FfmpegRecordProcess(ffmpegPath,
+    width, height, fps, outputPath);
   ffmpegProcess->spawn();
 
   while (!checkForExit())
@@ -63,5 +64,6 @@ uint32_t RecordThread::run()
   {
     ffmpegProcess->waitForExit();
   }
+  delete ffmpegProcess;
   return 0;
 }

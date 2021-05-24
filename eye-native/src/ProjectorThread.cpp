@@ -3,13 +3,12 @@
 
 using namespace std;
 
-ProjectorThread::ProjectorThread(int32_t xi, int32_t yi, uint32_t f,
-    bool scale, shared_ptr<Queue<FrameWrapper*>> inputQueue,
+ProjectorThread::ProjectorThread(int32_t xi, int32_t yi, bool scale,
+    shared_ptr<Queue<FrameWrapper*>> inputQueue,
     shared_ptr<Queue<FrameWrapper*>> outputQueue) :
   Thread("projector"),
   x(xi),
   y(yi),
-  fps(f),
   scaleToFit(scale),
   inputFrameQueue(inputQueue),
   outputFrameQueue(outputQueue)

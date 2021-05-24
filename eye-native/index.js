@@ -31,14 +31,15 @@ function setModuleRoot(moduleRoot) {
 }
 
 /**
- * The initializeFfmpeg() function should be called before any of the video-related
- * functions below to set the location of the ffmpeg and ffprobe executables.
+ * The initialize() function should be called before any of the video-related functions
+ * below to set the location of the ffmpeg and ffprobe executables and specify the
+ * logging callback.
  */
-function initializeFfmpeg(ffmpegPath, ffprobePath) {
+function initialize(ffmpegPath, ffprobePath, logCallback) {
   if (native === null) {
     throw new Error('Native module has not been initialized');
   }
-  native.initializeFfmpeg(ffmpegPath, ffprobePath);
+  native.initialize(ffmpegPath, ffprobePath, logCallback);
 }
 
 /**
@@ -81,11 +82,11 @@ function closeVideoOutput() {
  * getDisplayFrequency() allows us to get a monitor's display frequency.
  */
 
-function beginVideoPlayback(x, y, videos, fps, scaleToFit) {
+function beginVideoPlayback(x, y, videos, scaleToFit) {
   if (native === null) {
     throw new Error('Native module has not been initialized');
   }
-  return native.beginVideoPlayback(x, y, videos, fps, scaleToFit);
+  return native.beginVideoPlayback(x, y, videos, scaleToFit);
 }
 
 function endVideoPlayback() {
@@ -141,7 +142,7 @@ function closePreviewChannel() {
 module.exports = {
   getModuleRoot,
   setModuleRoot,
-  initializeFfmpeg,
+  initialize,
   createVideoOutput,
   queueNextFrame,
   checkCompletedFrames,

@@ -2,6 +2,7 @@
 // parameters and return values to and from C++. Everything is set up in the
 // Init() function, called via index.js, and invoke the C++ functions
 // from Native.h.
+#pragma once
 
 #include <napi.h>
 
@@ -9,7 +10,17 @@ namespace wrapper
 {
   Napi::Object Init(Napi::Env env, Napi::Object exports);
 
-  void initializeFfmpeg(const Napi::CallbackInfo& info);
+  struct JsCallback
+  {
+    Napi::ThreadSafeFunction function;
+  };
+  JsCallback* createJsCallback(Napi::Env env, Napi::Function callback);
+  void invokeJsCallback(JsCallback* callback);
+  void invokeJsCallback(JsCallback* callback, std::string result);
+  void finalizeJsCallback(Napi::Env env, void *finalizeData,
+    JsCallback* callback);
+
+  void initialize(const Napi::CallbackInfo& info);
 
   Napi::String createVideoOutput(const Napi::CallbackInfo& info);
   Napi::Number queueNextFrame(const Napi::CallbackInfo& info);

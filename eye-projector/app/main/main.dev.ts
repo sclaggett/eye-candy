@@ -364,14 +364,13 @@ ipcMain.on('startRun', (_event, stringArg: string) => {
   }
   const ffprobePath = path.join(path.parse(args.ffmpegPath).dir, ffprobeName);
 
-  // Initialize the native library with the location of ffmpeg and start playing back
-  // the list of video files
-  eyeNative.initializeFfmpeg(args.ffmpegPath, ffprobePath);
+  // Initialize the native library with the location of ffmpeg and the log callback
+  // and start playing back the list of video files
+  eyeNative.initialize(args.ffmpegPath, ffprobePath, log);
   result = eyeNative.beginVideoPlayback(
     args.projectorX,
     args.projectorY,
     args.videos,
-    args.fps,
     args.scaleToFit
   );
   if (result !== '') {

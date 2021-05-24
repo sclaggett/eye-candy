@@ -50,9 +50,6 @@ type ControlState = {
   projHeight: number;
   projFps: number;
 
-  // Playback frame rate
-  fps: number;
-
   // Log messages
   log: string;
 
@@ -107,7 +104,6 @@ export default class Control extends React.Component<
       projWidth: 0,
       projHeight: 0,
       projFps: 0,
-      fps: 30,
       log: '',
       running: false,
       progress: 0,
@@ -350,7 +346,6 @@ export default class Control extends React.Component<
       return video.path;
     });
     args.metadata = this.state.metadata;
-    args.fps = this.state.fps;
     ipcRenderer.send('startRun', JSON.stringify(args));
 
     // Set the state to running so the UI will lock until the main process releases it
@@ -396,8 +391,7 @@ export default class Control extends React.Component<
     // Set the module root to initialize the native library
     eyeNative.setModuleRoot(moduleRoot);
 
-    // Open the preview channel and start calling onPreviewInterval() at an interval
-    // equivalent to twice the video rate.
+    // Open the preview channel and start calling onPreviewInterval() every 30 ms.
     const ret = eyeNative.openPreviewChannel(channelName);
     if (ret !== '') {
       const message = `Error opening preview channel: ${ret}\n`;
@@ -406,11 +400,7 @@ export default class Control extends React.Component<
       }));
       return;
     }
-    let timeout = 30;
-    if (this.state.fps !== 0) {
-      timeout = 1000 / this.state.fps;
-    }
-    this.previewInterval = setInterval(this.onPreviewInterval, timeout);
+    this.previewInterval = setInterval(this.onPreviewInterval, 30);
   }
 
   /*
@@ -535,8 +525,7 @@ export default class Control extends React.Component<
       this.state.ffmpegPath.length === 0 ||
       this.state.projectorLatency === 0 ||
       this.state.videos.length === 0 ||
-      this.state.projDetected === false ||
-      this.state.fps === 0;
+      this.state.projDetected === false;
     let projInfo = '';
     if (this.state.projDetected) {
       projInfo = `${this.state.projWidth} x ${this.state.projHeight} at ${this.state.projFps} fps`;
@@ -627,21 +616,6 @@ export default class Control extends React.Component<
             onClick={this.onProjectorRefresh}
           />
         </div>
-        <div className={styles.row}>
-          <div className={styles.field}>Playback</div>
-          <div className={styles.value}>
-            <input
-              className={styles.inputNarrow}
-              type="text"
-              name="fps"
-              value={this.state.fps}
-              disabled={this.state.running}
-              onChange={this.onInputChange}
-            />
-            <div className={styles.videoFormatText}>fps</div>
-          </div>
-        </div>
-
         <div className={styles.row}>
           <div className={styles.buttons}>
             <div className={styles.buttonPadding} />

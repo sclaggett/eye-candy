@@ -1,12 +1,12 @@
-#include "FfmpegProcess.h"
+#include "FfmpegRecordProcess.h"
 #include "Platform.h"
 #include <stdexcept>
 
 using namespace std;
 
-FfmpegProcess::FfmpegProcess(string exec, uint32_t width, uint32_t height, uint32_t fps,
-    string outputPath) :
-  Thread("ffmpeg"),
+FfmpegRecordProcess::FfmpegRecordProcess(string exec, uint32_t width, uint32_t height,
+    uint32_t fps, string outputPath) :
+  Thread("ffmpegrecord"),
   executable(exec)
 {
   // Check options using:
@@ -43,24 +43,22 @@ FfmpegProcess::FfmpegProcess(string exec, uint32_t width, uint32_t height, uint3
 
   arguments.push_back("-y");
   
-  //ffmpeg -i video.mp4 -c:v rawvideo -pix_fmt yuv420p out.yuv
-
   arguments.push_back(outputPath);
 }
 
-uint32_t FfmpegProcess::run()
+uint32_t FfmpegRecordProcess::run()
 {
   if (!startProcess())
   {
     return 1;
   }
-  stdoutReader = shared_ptr<PipeReader>(new PipeReader("ffmpeg_stdout",
+  stdoutReader = shared_ptr<PipeReader>(new PipeReader("ffmpegrecord_stdout",
     processStdout));
-  stderrReader = shared_ptr<PipeReader>(new PipeReader("ffmpeg_stderr",
+  stderrReader = shared_ptr<PipeReader>(new PipeReader("ffmpegrecord_stderr",
     processStderr));
   if (!stdoutReader->spawn() || !stderrReader->spawn())
   {
-    fprintf(stderr, "[FfmpegProcess] ERROR: Failed to spawn reader threads\n");
+    fprintf(stderr, "[FfmpegRecordProcess] ERROR: Failed to spawn reader threads\n");
     return 1;
   }
   processMutex.lock();
@@ -72,7 +70,7 @@ uint32_t FfmpegProcess::run()
     if (!stdoutReader->isRunning() ||
       !stderrReader->isRunning())
     {
-      fprintf(stderr, "[FfmpegProcess] ERROR: A process thread has exited unexpectedly\n");
+      fprintf(stderr, "[FfmpegRecordProcess] ERROR: A process thread has exited unexpectedly\n");
       break;
     }
     if (checkForExit())
@@ -106,13 +104,13 @@ uint32_t FfmpegProcess::run()
   return 0;
 }
 
-bool FfmpegProcess::startProcess()
+bool FfmpegRecordProcess::startProcess()
 {
   return platform::spawnProcess(executable, arguments, processPid, processStdin,
     processStdout, processStderr);
 }
 
-bool FfmpegProcess::isProcessRunning()
+bool FfmpegRecordProcess::isProcessRunning()
 {
   std::unique_lock<std::mutex> lock(processMutex);
   if (processPid == 0)
@@ -122,7 +120,7 @@ bool FfmpegProcess::isProcessRunning()
   return platform::isProcessRunning(processPid);
 }
 
-void FfmpegProcess::waitForExit()
+void FfmpegRecordProcess::waitForExit()
 {
   if (processStdin != 0)
   {
@@ -135,7 +133,7 @@ void FfmpegProcess::waitForExit()
   }
 }
 
-bool FfmpegProcess::writeStdin(uint8_t* data, uint32_t length)
+bool FfmpegRecordProcess::writeStdin(uint8_t* data, uint32_t length)
 {
   if (processStdin == 0)
   {
@@ -145,12 +143,12 @@ bool FfmpegProcess::writeStdin(uint8_t* data, uint32_t length)
   return ((bytesWritten >= 0) || ((uint32_t)bytesWritten == length));
 }
 
-void FfmpegProcess::terminateProcess()
+void FfmpegRecordProcess::terminateProcess()
 {
   platform::terminateProcess(processPid, 1);
 }
 
-void FfmpegProcess::cleanUpProcess()
+void FfmpegRecordProcess::cleanUpProcess()
 {
   if (processStdin != 0)
   {
@@ -169,7 +167,7 @@ void FfmpegProcess::cleanUpProcess()
   }
 }
 
-vector<string> FfmpegProcess::splitString(string str, string sep)
+vector<string> FfmpegRecordProcess::splitString(string str, string sep)
 {
   vector<string> arr;
   char* cstr = const_cast<char*>(str.c_str());

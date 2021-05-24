@@ -8,7 +8,7 @@
 class ProjectorThread : public Thread
 {
 public:
-  ProjectorThread(int32_t x, int32_t y, uint32_t fps, bool scaleToFit,
+  ProjectorThread(int32_t x, int32_t y, bool scaleToFit,
     std::shared_ptr<Queue<FrameWrapper*>> inputFrameQueue,
     std::shared_ptr<Queue<FrameWrapper*>> outputFrameQueue);
   virtual ~ProjectorThread() {};
@@ -18,7 +18,6 @@ public:
 private:
   int32_t x;
   int32_t y;
-  uint32_t fps;
   bool scaleToFit;
   std::shared_ptr<Queue<FrameWrapper*>> inputFrameQueue;
   std::shared_ptr<Queue<FrameWrapper*>> outputFrameQueue;

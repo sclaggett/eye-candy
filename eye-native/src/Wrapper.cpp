@@ -1,5 +1,4 @@
 #include "Wrapper.h"
-#include "FfmpegProcess.h"
 #include "Native.h"
 #include <stdio.h>
 
@@ -7,7 +6,7 @@ using namespace std;
 
 Napi::Object wrapper::Init(Napi::Env env, Napi::Object exports)
 {
-  exports.Set("initializeFfmpeg", Napi::Function::New(env, wrapper::initializeFfmpeg));
+  exports.Set("initialize", Napi::Function::New(env, wrapper::initialize));
 
   exports.Set("createVideoOutput", Napi::Function::New(env, wrapper::createVideoOutput));
   exports.Set("queueNextFrame", Napi::Function::New(env, wrapper::queueNextFrame));
@@ -25,19 +24,68 @@ Napi::Object wrapper::Init(Napi::Env env, Napi::Object exports)
   return exports;
 }
 
-void wrapper::initializeFfmpeg(const Napi::CallbackInfo& info)
+wrapper::JsCallback* wrapper::createJsCallback(Napi::Env env,
+  Napi::Function callback)
+{
+  wrapper::JsCallback* jsCallback = new JsCallback();
+  jsCallback->function = Napi::ThreadSafeFunction::New(env, callback, "JSCB",
+    0, 1, jsCallback, wrapper::finalizeJsCallback, (void*)nullptr);
+  return jsCallback;
+}
+
+void wrapper::invokeJsCallback(wrapper::JsCallback* callback)
+{
+  auto helperFunction = [](Napi::Env env, Napi::Function jsCallback)
+  {
+    jsCallback.Call({});
+  };
+  napi_status status = callback->function.BlockingCall(helperFunction);
+  if (status != napi_ok) {
+    Napi::Error::Fatal("ThreadEntry",
+      "Napi::ThreadSafeNapi::Function.BlockingCall() failed");
+  }
+}
+
+void wrapper::invokeJsCallback(wrapper::JsCallback* callback, string result)
+{
+  auto helperFunction = [](Napi::Env env, Napi::Function jsCallback,
+    string* data)
+  {
+    jsCallback.Call({Napi::String::New(env, *data)});
+    delete data;
+  };
+
+  string* strResult = new string(result);
+  napi_status status = callback->function.NonBlockingCall(strResult,
+    helperFunction);
+  if (status != napi_ok) {
+    Napi::Error::Fatal("ThreadEntry",
+      "Napi::ThreadSafeNapi::Function.BlockingCall() failed");
+  }
+}
+
+void wrapper::finalizeJsCallback(Napi::Env env, void *finalizeData,
+  wrapper::JsCallback* callback)
+{
+  delete callback;
+}
+
+void wrapper::initialize(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
-  if ((info.Length() != 2) ||
+  if ((info.Length() != 3) ||
     !info[0].IsString() ||
-    !info[1].IsString())
+    !info[1].IsString() ||
+    !info[2].IsFunction())
   {
     Napi::TypeError::New(env, "Incorrect parameter type").ThrowAsJavaScriptException();
     return;
   }
   Napi::String ffmpegPath = info[0].As<Napi::String>();  
   Napi::String ffprobePath = info[1].As<Napi::String>();  
-  native::initializeFfmpeg(env, ffmpegPath, ffprobePath);
+  Napi::Function logCallback = info[2].As<Napi::Function>();
+  wrapper::JsCallback* logJsCallback = createJsCallback(env, logCallback);
+  native::initialize(env, ffmpegPath, ffprobePath, logJsCallback);
 }
 
 Napi::String wrapper::createVideoOutput(const Napi::CallbackInfo& info)
@@ -102,12 +150,11 @@ void wrapper::closeVideoOutput(const Napi::CallbackInfo& info)
 Napi::String wrapper::beginVideoPlayback(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
-  if ((info.Length() != 5) ||
+  if ((info.Length() != 4) ||
     !info[0].IsNumber() ||
     !info[1].IsNumber() ||
     !info[2].IsArray() ||
-    !info[3].IsNumber() ||
-    !info[4].IsBoolean())
+    !info[3].IsBoolean())
   {
     Napi::TypeError::New(env, "Incorrect parameter type").ThrowAsJavaScriptException();
     return Napi::String();
@@ -122,9 +169,8 @@ Napi::String wrapper::beginVideoPlayback(const Napi::CallbackInfo& info)
     string video = value.ToString().Utf8Value();
     videos.push_back(video);
   }
-  Napi::Number fps = info[3].As<Napi::Number>();
-  bool scaleToFit = info[4].As<Napi::Boolean>();
-  return Napi::String::New(env, native::beginVideoPlayback(env, x, y, videos, fps, scaleToFit));
+  bool scaleToFit = info[3].As<Napi::Boolean>();
+  return Napi::String::New(env, native::beginVideoPlayback(env, x, y, videos, scaleToFit));
 }
 
 Napi::String wrapper::endVideoPlayback(const Napi::CallbackInfo& info)
