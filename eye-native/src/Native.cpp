@@ -164,7 +164,8 @@ string native::beginVideoPlayback(Napi::Env env, int32_t x, int32_t y,
   // queue, display they in sync with the monitor's vertical refresh, and move
   // them on to the preview frames queue
   gProjectorThread = shared_ptr<ProjectorThread>(new ProjectorThread(x, y,
-    scaleToFit, gPendingFrameQueue, gPreviewFrameQueue, positionCallback));
+    scaleToFit, gPendingFrameQueue, gPreviewFrameQueue, gLogCallback,
+    positionCallback));
   gProjectorThread->spawn();
 
   // Spawn the preview send thread that will transmit the frames from the preview

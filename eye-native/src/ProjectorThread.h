@@ -12,7 +12,7 @@ public:
   ProjectorThread(int32_t x, int32_t y, bool scaleToFit,
     std::shared_ptr<Queue<std::shared_ptr<FrameWrapper>>> inputFrameQueue,
     std::shared_ptr<Queue<std::shared_ptr<FrameWrapper>>> outputFrameQueue,
-    wrapper::JsCallback* positionCallback);
+    wrapper::JsCallback* logCallback, wrapper::JsCallback* positionCallback);
   virtual ~ProjectorThread() {};
 
   uint32_t run();
@@ -23,5 +23,6 @@ private:
   bool scaleToFit;
   std::shared_ptr<Queue<std::shared_ptr<FrameWrapper>>> inputFrameQueue;
   std::shared_ptr<Queue<std::shared_ptr<FrameWrapper>>> outputFrameQueue;
+  wrapper::JsCallback* logCallback;
   wrapper::JsCallback* positionCallback;
 };

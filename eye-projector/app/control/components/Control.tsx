@@ -53,9 +53,11 @@ type ControlState = {
   // Log messages
   log: string;
 
-  // Flag that indicates if we're running and the percent complete
+  // Flag that indicates if we're running, the time elapsed and total duration in
+  // milliseconds, and the percent complete
   running: boolean;
-  progress: number;
+  runElapsedMs: number;
+  runTotalMs: number;
 
   // Preview image URL and position
   imageUrl: string;
@@ -106,7 +108,8 @@ export default class Control extends React.Component<
       projFps: 0,
       log: '',
       running: false,
-      progress: 0,
+      runElapsedMs: 0,
+      runTotalMs: 0,
       imageUrl: '',
       imageTop: 0,
       imageLeft: 0,
@@ -353,7 +356,8 @@ export default class Control extends React.Component<
     // Set the state to running so the UI will lock until the main process releases it
     this.setState(({
       running: true,
-      progress: 0,
+      runElapsedMs: 0,
+      runTotalMs: 0,
       imageUrl: '',
     } as unknown) as ControlState);
   }
@@ -445,11 +449,15 @@ export default class Control extends React.Component<
    * and as playback progresses.
    */
   onPlaybackDuration(_event: IpcRendererEvent, duration: number) {
-    console.log(`## onPlaybackDuration: ${duration}`);
+    this.setState({
+      runTotalMs: duration,
+    });
   }
 
   onPlaybackPosition(_event: IpcRendererEvent, position: number) {
-    console.log(`## onPlaybackPosition: ${position}`);
+    this.setState((prevState) => ({
+      runElapsedMs: position,
+    }));
   }
 
   /*
@@ -511,6 +519,28 @@ export default class Control extends React.Component<
   }
 
   /*
+   * The formatDuration() function converts a duration from milliseconds to
+   * "hour:minutes:seconds".
+   */
+  formatDuration(durationMs) {
+    const durationSec = Math.round(durationMs / 1000);
+    const seconds = durationSec % 60;
+    const durationMin = (durationSec - seconds) / 60;
+    const minutes = durationMin % 60;
+    const hours = (durationMin - minutes) / 60;
+    let ret = `${hours.toString()}:`;
+    if (minutes < 10) {
+      ret += '0';
+    }
+    ret += `${minutes.toString()}:`;
+    if (seconds < 10) {
+      ret += '0';
+    }
+    ret += seconds.toString();
+    return ret;
+  }
+
+  /*
    * The render() function converts the state into a JSX description of the interface
    * that should be displayed and the framework will update the output as necessary.
    */
@@ -535,6 +565,13 @@ export default class Control extends React.Component<
       width: `${this.state.imageWidth}px`,
       height: `${this.state.imageHeight}px`,
     };
+
+    let progress = '';
+    if (this.state.running) {
+      progress = `${this.formatDuration(
+        this.state.runElapsedMs
+      )}/${this.formatDuration(this.state.runTotalMs)}`;
+    }
 
     return (
       <div className={styles.container}>
@@ -634,7 +671,7 @@ export default class Control extends React.Component<
               className={styles.progress}
               style={this.state.running ? {} : { visibility: 'hidden' }}
             >
-              {`${this.state.progress.toString()}%`}
+              {`${progress}`}
             </div>
           </div>
         </div>

@@ -298,3 +298,19 @@ uint32_t platform::getDisplayFrequency(int32_t x, int32_t y)
   }
   return devMode.dmDisplayFrequency;
 }
+
+bool platform::createProjectorWindow(uint32_t x, uint32_t y)
+{
+  return true;
+}
+
+bool platform::displayProjectorFrame(std::shared_ptr<FrameWrapper> wrapper)
+{
+  uint32_t sleepMs = (uint32_t)(1000.0 / wrapper->fps);
+  platform::sleep(sleepMs);
+  return true;
+}
+
+void platform::destroyProjectorWindow()
+{
+}
