@@ -64,6 +64,25 @@ void wrapper::invokeJsCallback(wrapper::JsCallback* callback, string result)
   }
 }
 
+void wrapper::invokeJsCallback(JsCallback* callback, uint32_t result)
+{
+  auto helperFunction = [](Napi::Env env, Napi::Function jsCallback,
+    uint32_t* data)
+  {
+    jsCallback.Call({Napi::Number::New(env, *data)});
+    delete data;
+  };
+
+  uint32_t* intResult = new uint32_t();
+  *intResult = result;
+  napi_status status = callback->function.NonBlockingCall(intResult,
+    helperFunction);
+  if (status != napi_ok) {
+    Napi::Error::Fatal("ThreadEntry",
+      "Napi::ThreadSafeNapi::Function.BlockingCall() failed");
+  }
+}
+
 void wrapper::finalizeJsCallback(Napi::Env env, void *finalizeData,
   wrapper::JsCallback* callback)
 {
@@ -81,8 +100,8 @@ void wrapper::initialize(const Napi::CallbackInfo& info)
     Napi::TypeError::New(env, "Incorrect parameter type").ThrowAsJavaScriptException();
     return;
   }
-  Napi::String ffmpegPath = info[0].As<Napi::String>();  
-  Napi::String ffprobePath = info[1].As<Napi::String>();  
+  Napi::String ffmpegPath = info[0].As<Napi::String>();
+  Napi::String ffprobePath = info[1].As<Napi::String>();
   Napi::Function logCallback = info[2].As<Napi::Function>();
   wrapper::JsCallback* logJsCallback = createJsCallback(env, logCallback);
   native::initialize(env, ffmpegPath, ffprobePath, logJsCallback);
@@ -150,11 +169,13 @@ void wrapper::closeVideoOutput(const Napi::CallbackInfo& info)
 Napi::String wrapper::beginVideoPlayback(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
-  if ((info.Length() != 4) ||
+  if ((info.Length() != 6) ||
     !info[0].IsNumber() ||
     !info[1].IsNumber() ||
     !info[2].IsArray() ||
-    !info[3].IsBoolean())
+    !info[3].IsBoolean() ||
+    !info[4].IsFunction() ||
+    !info[5].IsFunction())
   {
     Napi::TypeError::New(env, "Incorrect parameter type").ThrowAsJavaScriptException();
     return Napi::String();
@@ -170,7 +191,12 @@ Napi::String wrapper::beginVideoPlayback(const Napi::CallbackInfo& info)
     videos.push_back(video);
   }
   bool scaleToFit = info[3].As<Napi::Boolean>();
-  return Napi::String::New(env, native::beginVideoPlayback(env, x, y, videos, scaleToFit));
+  Napi::Function durationCallback = info[4].As<Napi::Function>();
+  wrapper::JsCallback* durationJsCallback = createJsCallback(env, durationCallback);
+  Napi::Function positionCallback = info[5].As<Napi::Function>();
+  wrapper::JsCallback* positionJsCallback = createJsCallback(env, positionCallback);
+  return Napi::String::New(env, native::beginVideoPlayback(env, x, y, videos, scaleToFit,
+    durationJsCallback, positionJsCallback));
 }
 
 Napi::String wrapper::endVideoPlayback(const Napi::CallbackInfo& info)

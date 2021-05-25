@@ -36,6 +36,7 @@ const eyeNative = require('eye-native');
 const eyeNativeModuleRoot = eyeNative.getModuleRoot();
 
 let controlWindow: BrowserWindow | null = null;
+let durationMs = 0;
 
 /*
  * Install tools to aid in development and debugging. We use the 'source-map-support'
@@ -98,10 +99,38 @@ function log(message: string) {
 /**
  * The runStopped() function cleans up any run in progress and notifies the control window.
  */
-function runStopped() {
+function runStopped(message) {
+  // End video playback
+  const result = eyeNative.endVideoPlayback();
+  if (result !== '') {
+    log(`Error stopping run: ${result}\n`);
+  } else {
+    log(`${message}\n`);
+  }
+
   // Notify the control window
   if (controlWindow && controlWindow.webContents) {
     controlWindow.webContents.send('runStopped');
+  }
+}
+
+/**
+ * The playbackDuration() and playbackProgress() functions pass the total duration of the
+ * video files and the current position, both in seconds, to the control window for
+ * display to the user.
+ */
+function playbackDuration(duration: number) {
+  durationMs = duration;
+  if (controlWindow && controlWindow.webContents) {
+    controlWindow.webContents.send('playbackDuration', duration);
+  }
+}
+function playbackPosition(position: number) {
+  if (controlWindow && controlWindow.webContents) {
+    controlWindow.webContents.send('playbackPosition', position);
+  }
+  if (position >= durationMs) {
+    runStopped('Run complete');
   }
 }
 
@@ -371,7 +400,9 @@ ipcMain.on('startRun', (_event, stringArg: string) => {
     args.projectorX,
     args.projectorY,
     args.videos,
-    args.scaleToFit
+    args.scaleToFit,
+    playbackDuration,
+    playbackPosition
   );
   if (result !== '') {
     log(`Error: ${result}\n`);
@@ -395,13 +426,7 @@ ipcMain.on('startRun', (_event, stringArg: string) => {
  * wants to cancel the current run.
  */
 ipcMain.on('cancelRun', (_event) => {
-  const result = eyeNative.endVideoPlayback();
-  if (result !== '') {
-    log(`Error terminating run: ${result}\n`);
-  } else {
-    log('Run terminated\n');
-  }
-  runStopped();
+  runStopped('Run terminated');
 });
 
 /**

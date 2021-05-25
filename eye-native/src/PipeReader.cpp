@@ -3,9 +3,10 @@
 
 using namespace std;
 
-PipeReader::PipeReader(string name, uint32_t f) :
+PipeReader::PipeReader(string name, uint32_t f, uint32_t max) :
   Thread(name),
-  file(f)
+  file(f),
+  maxBuffer(max)
 {
 }
 
@@ -23,8 +24,15 @@ uint32_t PipeReader::run()
   bool closed;
   while (!checkForExit())
   {
+    // Sleep if we've exceeded our max buffer size
+    if ((maxBuffer != 0) && (data.size() > maxBuffer))
+    {
+      platform::sleep(10);
+      continue;
+    }
+    
     // Wait for data to become available to read and continue around the loop if nothing
-    // arrives within 100 ms
+    // arrives within 10 ms
     int32_t ret = platform::waitForData(file, 10);
     if (ret == -1)
     {

@@ -16,7 +16,7 @@ public:
   bool waitItem(T* item, int timeout);
   std::vector<T> waitAllItems(int timeout);
 
-  int size();
+  uint32_t size();
   bool empty();
   void clear();
 
@@ -72,7 +72,7 @@ std::vector<T> Queue<T>::waitAllItems(int timeout)
 }
 
 template <typename T>
-int Queue<T>::size()
+uint32_t Queue<T>::size()
 {
   std::unique_lock<std::mutex> lock(queueMutex);
   return itemQueue.size();

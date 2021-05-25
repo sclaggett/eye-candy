@@ -8,6 +8,7 @@
       "src/FfmpegRecordProcess.cpp",
       "src/FfprobeProcess.cpp",
       "src/FrameHeader.cpp",
+      "src/FrameWrapper.cpp",
       "src/main.cpp",
       "src/Native.cpp",
       "src/PipeReader.cpp",

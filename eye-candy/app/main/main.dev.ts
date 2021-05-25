@@ -626,7 +626,7 @@ function spawnFFmpeg() {
   if (videoInfo === null) {
     return false;
   }
-  eyeNative.initializeFfmpeg(videoInfo.ffmpegPath);
+  eyeNative.initialize(videoInfo.ffmpegPath, ffprobePath, log);
   const result: string = eyeNative.createVideoOutput(
     videoInfo.width,
     videoInfo.height,

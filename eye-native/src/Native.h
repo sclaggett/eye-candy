@@ -18,7 +18,8 @@ namespace native
   void closeVideoOutput(Napi::Env env);
 
   std::string beginVideoPlayback(Napi::Env env, int32_t x, int32_t y,
-    std::vector<std::string> videos, bool scaleToFit);
+    std::vector<std::string> videos, bool scaleToFit,
+    wrapper::JsCallback* durationCallback, wrapper::JsCallback* positionCallback);
   std::string endVideoPlayback(Napi::Env env);
   uint32_t getDisplayFrequency(Napi::Env env, int32_t x, int32_t y);
 

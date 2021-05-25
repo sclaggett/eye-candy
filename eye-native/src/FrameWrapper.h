@@ -1,27 +1,33 @@
 #pragma once
 
-// This structure encapsulates a frame throughout the native code
-typedef struct
+#include <cstdint>
+
+class FrameWrapper
 {
-  // Unique identifier we have given this frame object
-  uint32_t id;
+public:
+  FrameWrapper(uint32_t number);
+  virtual ~FrameWrapper();
 
-  // A pointer to the raw frame bytes from the Electron framework and
-  // the buffer length. Data is encoded in the BGRA colorspace, is
-  // owned by the framework, and should not be deleted
-  uint8_t* frame;
-  size_t length;
+  // Frame number, timestamp in milliseconds, and the target playback rate
+  uint32_t number;
+  uint64_t timestampMs;
+  uint32_t fps;
 
-  // Dimensions of the frame above
-  uint32_t width;
-  uint32_t height;
+  // A pointer to the raw frame bytes from the Electron framework, the
+  // buffer length, and the frame dimensions. Data is encoded in the BGRA
+  // colorspace. This memory is owned by the framework and should not be
+  // deleted.
+  uint8_t* electronFrame;
+  size_t electronLength;
+  uint32_t electronWidth;
+  uint32_t electronHeight;
 
-  // The Eletron framework appears to sometimes capture the window at 2x
-  // resolution. The variables below contain the image sized down to
-  // the correct dimensions, is owned by the native code, and should be
-  // deleted when finised
+  // A pointer to the raw frame bytes that were allocated by the native
+  // code and which should be released when finished. This is used during
+  // recording to size the 2x frame capture by Eletron down to the target
+  // size and during playback to hold the frame decoded by ffmpeg
   uint8_t* nativeFrame;
   size_t nativeLength;
   uint32_t nativeWidth;
   uint32_t nativeHeight;
-} FrameWrapper;
+};

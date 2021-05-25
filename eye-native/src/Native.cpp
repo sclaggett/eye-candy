@@ -17,9 +17,9 @@ string gFfmpegPath, gFfprobePath;
 wrapper::JsCallback* gLogCallback = 0;
 bool gInitialized = false, gRecording = false, gPlaying = false;
 uint32_t gNextFrameId = 0, gWidth = 0, gHeight = 0;
-shared_ptr<Queue<FrameWrapper*>> gPendingFrameQueue(new Queue<FrameWrapper*>());
-shared_ptr<Queue<FrameWrapper*>> gPreviewFrameQueue(new Queue<FrameWrapper*>());
-shared_ptr<Queue<FrameWrapper*>> gCompletedFrameQueue(new Queue<FrameWrapper*>());
+shared_ptr<Queue<shared_ptr<FrameWrapper>>> gPendingFrameQueue(new Queue<shared_ptr<FrameWrapper>>());
+shared_ptr<Queue<shared_ptr<FrameWrapper>>> gPreviewFrameQueue(new Queue<shared_ptr<FrameWrapper>>());
+shared_ptr<Queue<shared_ptr<FrameWrapper>>> gCompletedFrameQueue(new Queue<shared_ptr<FrameWrapper>>());
 shared_ptr<Queue<Mat*>> gPendingPreviewQueue(new Queue<Mat*>());
 shared_ptr<RecordThread> gRecordThread(nullptr);
 shared_ptr<PlaybackThread> gPlaybackThread(nullptr);
@@ -82,13 +82,11 @@ int32_t native::queueNextFrame(Napi::Env env, uint8_t* frame, size_t length, int
 
   // Wrap the incoming frame, resize it if it's too large, and place it in the queue for
   // the pipeline to process
-  FrameWrapper* wrapper = new FrameWrapper;
-  memset(wrapper, 0, sizeof(FrameWrapper));
-  wrapper->id = gNextFrameId++;
-  wrapper->frame = frame;
-  wrapper->length = length;
-  wrapper->width = width;
-  wrapper->height = height;
+  shared_ptr<FrameWrapper> wrapper = shared_ptr<FrameWrapper>(new FrameWrapper(gNextFrameId++));
+  wrapper->electronFrame = frame;
+  wrapper->electronLength = length;
+  wrapper->electronWidth = width;
+  wrapper->electronHeight = height;
   if ((width != gWidth) || (height != gHeight))
   {
     Mat fullFrame(height, width, CV_8UC4, frame);
@@ -101,23 +99,17 @@ int32_t native::queueNextFrame(Napi::Env env, uint8_t* frame, size_t length, int
     wrapper->nativeHeight = gHeight;
   }
   gPendingFrameQueue->addItem(wrapper);
-  return wrapper->id;
+  return wrapper->number;
 }
 
 vector<int32_t> native::checkCompletedFrames(Napi::Env env)
 {
   // Return an array of all frames that we're done with and free the associated memory
   vector<int32_t> ret;
-  FrameWrapper* wrapper;
+  shared_ptr<FrameWrapper> wrapper;
   while (gCompletedFrameQueue->waitItem(&wrapper, 0))
   {
-    ret.push_back(wrapper->id);
-    if (wrapper->nativeFrame != 0)
-    {
-      delete [] wrapper->nativeFrame;
-      wrapper->nativeFrame = 0;
-    }
-    delete wrapper;
+    ret.push_back(wrapper->number);
   }
   return ret;
 }
@@ -148,7 +140,8 @@ void native::closeVideoOutput(Napi::Env env)
 }
 
 string native::beginVideoPlayback(Napi::Env env, int32_t x, int32_t y,
-  vector<string> videos, bool scaleToFit)
+  vector<string> videos, bool scaleToFit, wrapper::JsCallback* durationCallback,
+  wrapper::JsCallback* positionCallback)
 {
   // Make sure we've been initialized and aren't currently playing
   if (!gInitialized)
@@ -163,14 +156,15 @@ string native::beginVideoPlayback(Napi::Env env, int32_t x, int32_t y,
   // Spawn the playback thread that will create the ffmpeg processes, read the
   // frames as they are decoded, and store then in the pending frames queue
   gPlaybackThread = shared_ptr<PlaybackThread>(new PlaybackThread(videos,
-    gPendingFrameQueue, gFfmpegPath, gFfprobePath, gLogCallback));
+    gPendingFrameQueue, gFfmpegPath, gFfprobePath, gLogCallback,
+    durationCallback));
   gPlaybackThread->spawn();
 
   // Spawn the projector thread that will take the frames in the pending frames
   // queue, display they in sync with the monitor's vertical refresh, and move
   // them on to the preview frames queue
   gProjectorThread = shared_ptr<ProjectorThread>(new ProjectorThread(x, y,
-    scaleToFit, gPendingFrameQueue, gPreviewFrameQueue));
+    scaleToFit, gPendingFrameQueue, gPreviewFrameQueue, positionCallback));
   gProjectorThread->spawn();
 
   // Spawn the preview send thread that will transmit the frames from the preview

@@ -136,7 +136,8 @@ export default class Control extends React.Component<
     this.onDisplayChange = this.onDisplayChange.bind(this);
     this.onRunPreviewChannel = this.onRunPreviewChannel.bind(this);
     this.onPreviewInterval = this.onPreviewInterval.bind(this);
-    this.onRunProgress = this.onRunProgress.bind(this);
+    this.onPlaybackDuration = this.onPlaybackDuration.bind(this);
+    this.onPlaybackPosition = this.onPlaybackPosition.bind(this);
     this.onRunStopped = this.onRunStopped.bind(this);
     this.onDirectorySelectClick = this.onDirectorySelectClick.bind(this);
     this.onFfmpegSelectClick = this.onFfmpegSelectClick.bind(this);
@@ -146,7 +147,8 @@ export default class Control extends React.Component<
     ipcRenderer.on('log', this.onLog);
     ipcRenderer.on('displayChange', this.onDisplayChange);
     ipcRenderer.on('runPreviewChannel', this.onRunPreviewChannel);
-    ipcRenderer.on('runProgress', this.onRunProgress);
+    ipcRenderer.on('playbackDuration', this.onPlaybackDuration);
+    ipcRenderer.on('playbackPosition', this.onPlaybackPosition);
     ipcRenderer.on('runStopped', this.onRunStopped);
   }
 
@@ -438,21 +440,16 @@ export default class Control extends React.Component<
   }
 
   /*
-   * The onRunProgress() function will be invoked by the main process at regular
-   * intervals to notify the control window as the run progresses.
+   * The onPlaybackDuration() and onPlaybackPosition() functions will be invoked
+   * by the main process to notify the control window of the total duration
+   * and as playback progresses.
    */
-  onRunProgress(
-    _event: IpcRendererEvent,
-    frameNumber: number,
-    framesTotal: number
-  ) {
-    let progress = Math.round((frameNumber * 100) / framesTotal);
-    if (progress > 100) {
-      progress = 100;
-    }
-    this.setState(({
-      progress,
-    } as unknown) as ControlState);
+  onPlaybackDuration(_event: IpcRendererEvent, duration: number) {
+    console.log(`## onPlaybackDuration: ${duration}`);
+  }
+
+  onPlaybackPosition(_event: IpcRendererEvent, position: number) {
+    console.log(`## onPlaybackPosition: ${position}`);
   }
 
   /*

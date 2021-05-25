@@ -8,8 +8,8 @@
 class RecordThread : public Thread
 {
 public:
-  RecordThread(std::shared_ptr<Queue<FrameWrapper*>> inputFrameQueue,
-    std::shared_ptr<Queue<FrameWrapper*>> outputFrameQueue,
+  RecordThread(std::shared_ptr<Queue<std::shared_ptr<FrameWrapper>>> inputFrameQueue,
+    std::shared_ptr<Queue<std::shared_ptr<FrameWrapper>>> outputFrameQueue,
     std::string ffmpegPath, uint32_t width, uint32_t height, uint32_t fps,
     std::string outputPath);
   virtual ~RecordThread() {};
@@ -17,8 +17,8 @@ public:
   uint32_t run();
 
 private:
-  std::shared_ptr<Queue<FrameWrapper*>> inputFrameQueue;
-  std::shared_ptr<Queue<FrameWrapper*>> outputFrameQueue;
+  std::shared_ptr<Queue<std::shared_ptr<FrameWrapper>>> inputFrameQueue;
+  std::shared_ptr<Queue<std::shared_ptr<FrameWrapper>>> outputFrameQueue;
   std::string ffmpegPath;
   uint32_t width;
   uint32_t height;

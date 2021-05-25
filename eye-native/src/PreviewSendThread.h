@@ -8,8 +8,8 @@
 class PreviewSendThread : public Thread
 {
 public:
-  PreviewSendThread(std::shared_ptr<Queue<FrameWrapper*>> inputFrameQueue,
-    std::shared_ptr<Queue<FrameWrapper*>> outputFrameQueue);
+  PreviewSendThread(std::shared_ptr<Queue<std::shared_ptr<FrameWrapper>>> inputFrameQueue,
+    std::shared_ptr<Queue<std::shared_ptr<FrameWrapper>>> outputFrameQueue);
   virtual ~PreviewSendThread() {};
 
   uint32_t run();
@@ -20,8 +20,8 @@ protected:
   bool writeAll(uint64_t file, const uint8_t* buffer, uint32_t length);
 
 private:
-  std::shared_ptr<Queue<FrameWrapper*>> inputFrameQueue;
-  std::shared_ptr<Queue<FrameWrapper*>> outputFrameQueue;
+  std::shared_ptr<Queue<std::shared_ptr<FrameWrapper>>> inputFrameQueue;
+  std::shared_ptr<Queue<std::shared_ptr<FrameWrapper>>> outputFrameQueue;
   std::string previewChannelName;
   std::mutex previewChannelMutex;
 };

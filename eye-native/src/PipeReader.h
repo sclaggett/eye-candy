@@ -8,7 +8,7 @@
 class PipeReader : public Thread
 {
 public:
-  PipeReader(std::string name, uint32_t file);
+  PipeReader(std::string name, uint32_t file, uint32_t maxBuffer = 0);
   virtual ~PipeReader() {};
 
 public:
@@ -16,7 +16,8 @@ public:
   uint32_t run();
 
 private:
-  uint32_t file = 0;
+  uint32_t file;
+  uint32_t maxBuffer;
   std::string data;
   std::mutex dataMutex;
 };

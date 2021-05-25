@@ -17,6 +17,7 @@ namespace wrapper
   JsCallback* createJsCallback(Napi::Env env, Napi::Function callback);
   void invokeJsCallback(JsCallback* callback);
   void invokeJsCallback(JsCallback* callback, std::string result);
+  void invokeJsCallback(JsCallback* callback, uint32_t result);
   void finalizeJsCallback(Napi::Env env, void *finalizeData,
     JsCallback* callback);
 

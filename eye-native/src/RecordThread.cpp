@@ -7,8 +7,8 @@
 using namespace std;
 using namespace cv;
 
-RecordThread::RecordThread(shared_ptr<Queue<FrameWrapper*>> inputQueue,
-    shared_ptr<Queue<FrameWrapper*>> outputQueue, string ffmpeg, uint32_t wid,
+RecordThread::RecordThread(shared_ptr<Queue<shared_ptr<FrameWrapper>>> inputQueue,
+    shared_ptr<Queue<shared_ptr<FrameWrapper>>> outputQueue, string ffmpeg, uint32_t wid,
     uint32_t hgt, uint32_t f, string output) :
   Thread("record"),
   inputFrameQueue(inputQueue),
@@ -30,7 +30,7 @@ uint32_t RecordThread::run()
 
   while (!checkForExit())
   {
-    FrameWrapper* wrapper = 0;
+    shared_ptr<FrameWrapper> wrapper;
     if (!inputFrameQueue->waitItem(&wrapper, 10))
     {
       continue;
@@ -46,8 +46,8 @@ uint32_t RecordThread::run()
     }
     else
     {
-      data = wrapper->frame;
-      length = wrapper->length;
+      data = wrapper->electronFrame;
+      length = wrapper->electronLength;
     }
 
     // Write the raw frame to the ffmpeg process and add it to the output queue

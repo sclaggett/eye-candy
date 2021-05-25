@@ -10,8 +10,8 @@ using namespace std;
 #define CHANNEL_OPEN 2
 #define CHANNEL_ERROR 3
 
-PreviewSendThread::PreviewSendThread(shared_ptr<Queue<FrameWrapper*>> inputQueue,
-    shared_ptr<Queue<FrameWrapper*>> outputQueue) :
+PreviewSendThread::PreviewSendThread(shared_ptr<Queue<shared_ptr<FrameWrapper>>> inputQueue,
+    shared_ptr<Queue<shared_ptr<FrameWrapper>>> outputQueue) :
   Thread("previewsend"),
   inputFrameQueue(inputQueue),
   outputFrameQueue(outputQueue)
@@ -25,7 +25,7 @@ uint32_t PreviewSendThread::run()
   uint64_t namedPipeId = 0;
   while (!checkForExit())
   {
-    FrameWrapper* wrapper = 0;
+    shared_ptr<FrameWrapper> wrapper;
     if (!inputFrameQueue->waitItem(&wrapper, 50))
     {
       continue;
@@ -84,10 +84,11 @@ uint32_t PreviewSendThread::run()
       }
       else
       {
-        string header = frameheader::format(frameNumber, wrapper->width, wrapper->height,
-          wrapper->length);
+        string header = frameheader::format(frameNumber, wrapper->electronWidth,
+          wrapper->electronHeight, wrapper->electronLength);
         if (!writeAll(namedPipeId, (const uint8_t*)header.data(), header.size()) ||
-          !writeAll(namedPipeId, (const uint8_t*)wrapper->frame, wrapper->length))
+          !writeAll(namedPipeId, (const uint8_t*)wrapper->electronFrame,
+            wrapper->electronLength))
         {
           channelState = CHANNEL_ERROR;
           continue;
@@ -99,15 +100,6 @@ uint32_t PreviewSendThread::run()
     if (outputFrameQueue != 0)
     {
       outputFrameQueue->addItem(wrapper);
-    }
-    else
-    {
-      if (wrapper->nativeFrame != 0)
-      {
-        delete [] wrapper->nativeFrame;
-        wrapper->nativeFrame = 0;
-      }
-      delete wrapper;
     }
     frameNumber += 1;
   }

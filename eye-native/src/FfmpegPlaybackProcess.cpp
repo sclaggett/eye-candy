@@ -48,7 +48,7 @@ uint32_t FfmpegPlaybackProcess::run()
     return 1;
   }
   stdoutReader = shared_ptr<PipeReader>(new PipeReader("ffmpegplayback_stdout",
-    processStdout));
+    processStdout, 10 * 1000 * 1000));
   stderrReader = shared_ptr<PipeReader>(new PipeReader("ffmpegplayback_stderr",
     processStderr));
   if (!stdoutReader->spawn() || !stderrReader->spawn())
