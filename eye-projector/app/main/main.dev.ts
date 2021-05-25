@@ -38,6 +38,11 @@ const eyeNativeModuleRoot = eyeNative.getModuleRoot();
 let controlWindow: BrowserWindow | null = null;
 let durationMs = 0;
 
+// Log segfault stack traces
+const SegfaultHandler = require('segfault-handler');
+
+SegfaultHandler.registerHandler('crash.log');
+
 /*
  * Install tools to aid in development and debugging. We use the 'source-map-support'
  * library in production to produce useful stack traces and the 'electron-debug'

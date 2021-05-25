@@ -1,7 +1,223 @@
 #include "Platform.h"
-#include <Windows.h>
+#include <afxwin.h>
+#include <afxpriv.h>
+#include <d3d11.h>
 
 using namespace std;
+
+// The ProjectorWindow class is derived from CFrameWnd and handles opening a
+// fullscreen window on the projector monitor
+class ProjectorWindow : public CFrameWnd
+{
+private:
+  HMONITOR hMonitor;
+  IDXGISwapChain* swapChain;
+  ID3D11Device* device;
+  ID3D11DeviceContext* context;
+  ID3D11RenderTargetView* view;
+
+public:
+  ProjectorWindow() :
+    hMonitor(0),
+    swapChain(0),
+    device(0),
+    context(0),
+    view(0)
+  {
+  };
+  virtual ~ProjectorWindow() {};
+
+  bool createWindow(uint32_t x, uint32_t y)
+  {
+    // Get the monitor from the point
+    POINT pt;
+    pt.x = x;
+    pt.y = y;
+    hMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+    if (hMonitor == NULL)
+    {
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to find monitor from point (%i, %i)\n", x, y);
+      return false;
+    }
+
+    // Get the dimensions of the projector monitor
+    MONITORINFO info;
+    memset(&info, 0, sizeof(MONITORINFO));
+    info.cbSize = sizeof(MONITORINFO);
+    if (!GetMonitorInfoA(hMonitor, &info))
+    {
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to get monitor info\n");
+      return false;
+    }
+    CRect projectorRect(info.rcMonitor);
+
+    // Create an instance of this class on the projector monitor and show it
+    if (!Create(NULL, _T("EyeCandy"), WS_OVERLAPPEDWINDOW, projectorRect))
+    {
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to create window\n");
+      return false;
+    }
+    ShowWindow(SW_SHOW);
+
+    // Create the swap chain
+    DXGI_SWAP_CHAIN_DESC swapChainDesc;
+    memset(&swapChainDesc, 0, sizeof(DXGI_SWAP_CHAIN_DESC));
+    swapChainDesc.BufferCount = 2;
+    swapChainDesc.BufferDesc.Width = projectorRect.Width();
+    swapChainDesc.BufferDesc.Height = projectorRect.Height();
+    swapChainDesc.BufferDesc.RefreshRate.Numerator = 0;
+    swapChainDesc.BufferDesc.RefreshRate.Denominator = 0;
+    swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    swapChainDesc.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
+    swapChainDesc.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
+    swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+    swapChainDesc.SampleDesc.Count = 1;
+    swapChainDesc.SampleDesc.Quality = 0;
+    swapChainDesc.OutputWindow = m_hWnd;
+    swapChainDesc.Windowed = FALSE;
+    swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+    //swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING | DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+    if (FAILED(D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, 0, NULL, 0,
+      D3D11_SDK_VERSION, &swapChainDesc, &swapChain, &device, NULL, &context)))
+    {
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to create swap chain\n");
+      return false;
+    }
+
+    // Make sure the application is full screen
+    IDXGIOutput* pTarget;
+    BOOL bFullscreen;
+    if (SUCCEEDED(swapChain->GetFullscreenState(&bFullscreen, &pTarget)))
+    {
+      pTarget->Release();
+    }
+    else
+    {
+      bFullscreen = FALSE;
+    }
+    if (!bFullscreen)
+    {
+      ShowWindow(SW_MINIMIZE);
+      ShowWindow(SW_RESTORE);
+      swapChain->SetFullscreenState(TRUE, NULL);
+    }
+
+    // Create a render target view
+    ID3D11Texture2D* backBuffer;
+    if (FAILED(swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBuffer)))
+    {
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to get back buffer\n");
+      return false;
+    }
+    HRESULT res = device->CreateRenderTargetView(backBuffer, NULL, &view);
+    backBuffer->Release();
+    if (FAILED(res))
+    {
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to create view\n");
+      return false;
+    }
+    context->OMSetRenderTargets(1, &view, NULL);
+
+    // Initialize the viewport
+    D3D11_VIEWPORT viewport;
+    viewport.Width = (FLOAT)swapChainDesc.BufferDesc.Width;
+    viewport.Height = (FLOAT)swapChainDesc.BufferDesc.Height;
+    viewport.MinDepth = 0.0f;
+    viewport.MaxDepth = 1.0f;
+    viewport.TopLeftX = 0;
+    viewport.TopLeftY = 0;
+    context->RSSetViewports(1, &viewport);
+    return true;
+  }
+
+  BOOL PreCreateWindow(CREATESTRUCT& cs) override
+  {
+    // Call the base implementation and then modify the style to make this a borderless, full-screen window
+    if (!CFrameWnd::PreCreateWindow(cs))
+    {
+      return FALSE;
+    }
+    cs.style |= WS_MAXIMIZE | WS_POPUP;
+    cs.style &= ~WS_CAPTION & ~WS_BORDER & ~WS_THICKFRAME;
+    return true;
+  }
+
+  bool displayFrame(shared_ptr<FrameWrapper> frame)
+  {
+    uint32_t sleepMs = (uint32_t)(1000.0 / frame->fps);
+    platform::sleep(sleepMs);
+    return true;
+  }
+
+  /*
+  void WaitForVBlank()
+  {
+    IDXGIOutput* output;
+    if (FAILED(swapChain->GetContainingOutput(&output)) || FAILED(output->WaitForVBlank()))
+    {
+      OutputDebugString("Failed to wait for vsync");
+    }
+  }
+
+  void PresentFrame(bool white)
+  {
+    if (white)
+    {
+      float color[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+      context->ClearRenderTargetView(view, color);
+    }
+    else
+    {
+      float color[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+      context->ClearRenderTargetView(view, color);
+    }
+    swapChain->Present(1, 0);
+  }
+  */
+
+  afx_msg void OnSize(UINT nType, int cx, int cy)
+  {
+    // resize the swap chain
+    if (swapChain && FAILED(swapChain->ResizeBuffers(0, cx, cy, DXGI_FORMAT_UNKNOWN, 0)))
+    {
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to resize the swap chain\n");
+    }
+  }
+
+  // We handle this private AFX message because CFrameWnd's implementation uses the
+  // AfxGetThread() function which returns NULL in our case and causes a segfault
+  LRESULT DummyActivateTopLevel(WPARAM wParam, LPARAM lParam)
+  {
+    return CWnd::OnActivateTopLevel(wParam, lParam);
+  }
+
+  afx_msg void OnDestroy()
+  {
+    if (swapChain != 0)
+    {
+      swapChain->Release();
+      swapChain = 0;
+    }
+    if (device != 0)
+    {
+      device->Release();
+      device = 0;
+    }
+    if (context != 0)
+    {
+      context->Release();
+      context = 0;
+    }
+  }
+
+  DECLARE_MESSAGE_MAP()
+};
+
+BEGIN_MESSAGE_MAP(ProjectorWindow, CFrameWnd)
+  ON_WM_SIZE()
+  ON_MESSAGE(WM_ACTIVATETOPLEVEL, &ProjectorWindow::DummyActivateTopLevel)
+  ON_WM_DESTROY()
+END_MESSAGE_MAP()
 
 void platform::sleep(uint32_t timeMs)
 {
@@ -299,18 +515,28 @@ uint32_t platform::getDisplayFrequency(int32_t x, int32_t y)
   return devMode.dmDisplayFrequency;
 }
 
+ProjectorWindow* gProjectorWindow = 0;
 bool platform::createProjectorWindow(uint32_t x, uint32_t y)
 {
-  return true;
+  fprintf(stderr, "## Creating projector window\n");
+  if (gProjectorWindow != 0)
+  {
+    fprintf(stderr, "[Platform_Win] ERROR: Projector window already exists, cannot create\n");
+    return false;
+  }
+  gProjectorWindow = new ProjectorWindow();
+  return gProjectorWindow->createWindow(x, y);
 }
 
-bool platform::displayProjectorFrame(std::shared_ptr<FrameWrapper> wrapper)
+bool platform::displayProjectorFrame(shared_ptr<FrameWrapper> wrapper)
 {
-  uint32_t sleepMs = (uint32_t)(1000.0 / wrapper->fps);
-  platform::sleep(sleepMs);
-  return true;
+  return gProjectorWindow->displayFrame(wrapper);
 }
 
 void platform::destroyProjectorWindow()
 {
+  fprintf(stderr, "## Destroying projector window\n");
+  gProjectorWindow->DestroyWindow();
+  gProjectorWindow = 0;
+  fprintf(stderr, "## Window destroyed\n");
 }
