@@ -17,6 +17,8 @@ public:
 
   uint32_t run();
 
+  bool terminate(uint32_t timeout = 100) override;
+
 private:
   int32_t x;
   int32_t y;

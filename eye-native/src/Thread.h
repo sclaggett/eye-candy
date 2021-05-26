@@ -11,7 +11,7 @@ public:
 
   bool spawn();
   bool isRunning();
-  bool terminate();
+  virtual bool terminate(uint32_t timeout = 100);
 
 protected:
   void signalExit();

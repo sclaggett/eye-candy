@@ -37,14 +37,14 @@ bool Thread::isRunning()
   return threadRunning;
 }
 
-bool Thread::terminate()
+bool Thread::terminate(uint32_t timeout /*= 100*/)
 {
   if (threadId == 0)
   {
     return true;
   }
   signalExit();
-  if (waitForCompletion(100))
+  if (waitForCompletion(timeout))
   {
     return false;
   }

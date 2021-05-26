@@ -51,3 +51,10 @@ uint32_t ProjectorThread::run()
   platform::destroyProjectorWindow();
   return 0;
 }
+
+bool ProjectorThread::terminate(uint32_t timeout /*= 100*/)
+{
+  // It can take longer than 100 ms for the projector thread to shut down so
+  // wait for up to a full second
+  return Thread::terminate(1000);
+}

@@ -14,15 +14,15 @@ private:
   IDXGISwapChain* swapChain;
   ID3D11Device* device;
   ID3D11DeviceContext* context;
-  ID3D11RenderTargetView* view;
+  ID3D11RenderTargetView* renderTarget;
 
 public:
   ProjectorWindow() :
-    hMonitor(0),
-    swapChain(0),
-    device(0),
-    context(0),
-    view(0)
+    hMonitor(nullptr),
+    swapChain(nullptr),
+    device(nullptr),
+    context(nullptr),
+    renderTarget(nullptr)
   {
   };
   virtual ~ProjectorWindow() {};
@@ -34,7 +34,7 @@ public:
     pt.x = x;
     pt.y = y;
     hMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
-    if (hMonitor == NULL)
+    if (hMonitor == nullptr)
     {
       fprintf(stderr, "[Platform_Win] ERROR: Failed to find monitor from point (%i, %i)\n", x, y);
       return false;
@@ -52,7 +52,7 @@ public:
     CRect projectorRect(info.rcMonitor);
 
     // Create an instance of this class on the projector monitor and show it
-    if (!Create(NULL, _T("EyeCandy"), WS_OVERLAPPEDWINDOW, projectorRect))
+    if (!Create(nullptr, _T("EyeCandy"), WS_OVERLAPPEDWINDOW, projectorRect))
     {
       fprintf(stderr, "[Platform_Win] ERROR: Failed to create window\n");
       return false;
@@ -74,60 +74,124 @@ public:
     swapChainDesc.SampleDesc.Count = 1;
     swapChainDesc.SampleDesc.Quality = 0;
     swapChainDesc.OutputWindow = m_hWnd;
-    swapChainDesc.Windowed = FALSE;
+    swapChainDesc.Windowed = TRUE;
     swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-    //swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING | DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
-    if (FAILED(D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, 0, NULL, 0,
-      D3D11_SDK_VERSION, &swapChainDesc, &swapChain, &device, NULL, &context)))
+    swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+    if (FAILED(D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE,
+      nullptr, 0, nullptr, 0, D3D11_SDK_VERSION, &swapChainDesc, &swapChain, &device,
+      nullptr, &context)))
     {
       fprintf(stderr, "[Platform_Win] ERROR: Failed to create swap chain\n");
       return false;
     }
 
-    // Make sure the application is full screen
-    IDXGIOutput* pTarget;
-    BOOL bFullscreen;
-    if (SUCCEEDED(swapChain->GetFullscreenState(&bFullscreen, &pTarget)))
+    // Detect if newly created full-screen swap chain isn't actually full screen. Note
+    // that the app is fullscreen given the way that we're creating it.
+    BOOL fullscreen;
+    if (FAILED(swapChain->GetFullscreenState(&fullscreen, nullptr)))
     {
-      pTarget->Release();
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to get fullscreen state\n");
+      return false;
     }
-    else
+    fprintf(stderr, "## Fullscreen: %i\n", fullscreen);
+    if (!fullscreen)
     {
-      bFullscreen = FALSE;
-    }
-    if (!bFullscreen)
-    {
-      ShowWindow(SW_MINIMIZE);
-      ShowWindow(SW_RESTORE);
-      swapChain->SetFullscreenState(TRUE, NULL);
+    fprintf(stderr, "## Switching to fullscreen\n");
+      swapChain->SetFullscreenState(true, nullptr);
     }
 
-    // Create a render target view
-    ID3D11Texture2D* backBuffer;
+    // Create back buffer
+    ID3D11Texture2D* backBuffer = nullptr;
     if (FAILED(swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBuffer)))
     {
       fprintf(stderr, "[Platform_Win] ERROR: Failed to get back buffer\n");
       return false;
     }
-    HRESULT res = device->CreateRenderTargetView(backBuffer, NULL, &view);
+
+    // Initialize the viewport
+    D3D11_VIEWPORT viewport;
+    viewport.Width = (FLOAT)projectorRect.Width();
+    viewport.Height = (FLOAT)projectorRect.Height();
+    viewport.MinDepth = 0.0f;
+    viewport.MaxDepth = 1.0f;
+    viewport.TopLeftX = 0;
+    viewport.TopLeftY = 0;
+    context->RSSetViewports(1, &viewport);
+
+    // Create render target
+    HRESULT res = device->CreateRenderTargetView(backBuffer, nullptr, &renderTarget);
     backBuffer->Release();
     if (FAILED(res))
     {
       fprintf(stderr, "[Platform_Win] ERROR: Failed to create view\n");
       return false;
     }
-    context->OMSetRenderTargets(1, &view, NULL);
-
-    // Initialize the viewport
-    D3D11_VIEWPORT viewport;
-    viewport.Width = (FLOAT)swapChainDesc.BufferDesc.Width;
-    viewport.Height = (FLOAT)swapChainDesc.BufferDesc.Height;
-    viewport.MinDepth = 0.0f;
-    viewport.MaxDepth = 1.0f;
-    viewport.TopLeftX = 0;
-    viewport.TopLeftY = 0;
-    context->RSSetViewports(1, &viewport);
+    context->OMSetRenderTargets(1, &renderTarget, nullptr);
     return true;
+  }
+
+  uint32_t temp = 0;
+  bool displayFrame(shared_ptr<FrameWrapper> frame)
+  {
+    // If you want the current mode, use unspecified values for all properties in FindClosestMatchingMode.
+    //DXGIOutput::FindClosestMatchingMode;
+
+    // Draw the frame
+    if ((temp++ % 30) < 15)
+    {
+      float color[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+      context->ClearRenderTargetView(renderTarget, color);
+    }
+    else
+    {
+      float color[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+      context->ClearRenderTargetView(renderTarget, color);
+    }
+
+    // Wait for vertical blank
+    IDXGIOutput* output;
+    if (FAILED(swapChain->GetContainingOutput(&output)) || FAILED(output->WaitForVBlank()))
+    {
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to wait for vsync\n");
+      return false;
+    }
+
+    // Present the frame
+    swapChain->Present(1, 0);
+    return true;
+  }
+
+  void destroyWindow()
+  {
+    if (swapChain != nullptr)
+    {
+      BOOL fullscreen = false;
+      swapChain->GetFullscreenState(&fullscreen, nullptr);
+      if (fullscreen)
+      {
+        swapChain->SetFullscreenState(false, nullptr);
+      }
+      swapChain->Release();
+      swapChain = nullptr;
+    }
+    if (renderTarget != nullptr)
+    {
+      renderTarget->Release();
+      renderTarget = 0;
+    }
+    if (context != nullptr)
+    {
+      context->ClearState();
+      context->Flush();
+      context->Release();
+      context = nullptr;
+    }
+    if (device != nullptr)
+    {
+      device->Release();
+      device = nullptr;
+    }
+    DestroyWindow();
   }
 
   BOOL PreCreateWindow(CREATESTRUCT& cs) override
@@ -135,50 +199,18 @@ public:
     // Call the base implementation and then modify the style to make this a borderless, full-screen window
     if (!CFrameWnd::PreCreateWindow(cs))
     {
-      return FALSE;
+      return false;
     }
     cs.style |= WS_MAXIMIZE | WS_POPUP;
     cs.style &= ~WS_CAPTION & ~WS_BORDER & ~WS_THICKFRAME;
     return true;
   }
 
-  bool displayFrame(shared_ptr<FrameWrapper> frame)
-  {
-    uint32_t sleepMs = (uint32_t)(1000.0 / frame->fps);
-    platform::sleep(sleepMs);
-    return true;
-  }
-
-  /*
-  void WaitForVBlank()
-  {
-    IDXGIOutput* output;
-    if (FAILED(swapChain->GetContainingOutput(&output)) || FAILED(output->WaitForVBlank()))
-    {
-      OutputDebugString("Failed to wait for vsync");
-    }
-  }
-
-  void PresentFrame(bool white)
-  {
-    if (white)
-    {
-      float color[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-      context->ClearRenderTargetView(view, color);
-    }
-    else
-    {
-      float color[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-      context->ClearRenderTargetView(view, color);
-    }
-    swapChain->Present(1, 0);
-  }
-  */
-
   afx_msg void OnSize(UINT nType, int cx, int cy)
   {
-    // resize the swap chain
-    if (swapChain && FAILED(swapChain->ResizeBuffers(0, cx, cy, DXGI_FORMAT_UNKNOWN, 0)))
+    // Resize the swap chain
+    if (swapChain && FAILED(swapChain->ResizeBuffers(0, cx, cy,
+      DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH)))
     {
       fprintf(stderr, "[Platform_Win] ERROR: Failed to resize the swap chain\n");
     }
@@ -189,25 +221,6 @@ public:
   LRESULT DummyActivateTopLevel(WPARAM wParam, LPARAM lParam)
   {
     return CWnd::OnActivateTopLevel(wParam, lParam);
-  }
-
-  afx_msg void OnDestroy()
-  {
-    if (swapChain != 0)
-    {
-      swapChain->Release();
-      swapChain = 0;
-    }
-    if (device != 0)
-    {
-      device->Release();
-      device = 0;
-    }
-    if (context != 0)
-    {
-      context->Release();
-      context = 0;
-    }
   }
 
   DECLARE_MESSAGE_MAP()
@@ -230,11 +243,11 @@ bool platform::spawnProcess(string executable, vector<string> arguments,
   // Set the bInheritHandle flag so pipe handles are inherited.
   SECURITY_ATTRIBUTES saAttr;
   saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
-  saAttr.bInheritHandle = TRUE;
-  saAttr.lpSecurityDescriptor = NULL;
+  saAttr.bInheritHandle = true;
+  saAttr.lpSecurityDescriptor = nullptr;
   
   // Create a pipe for the child process's stdout and ensure the read handle to the pipe is not inherited.
-  HANDLE childStdoutRd = NULL, childStdoutWr = NULL;
+  HANDLE childStdoutRd = nullptr, childStdoutWr = nullptr;
   if (!CreatePipe(&childStdoutRd, &childStdoutWr, &saAttr, 0))
   {
     fprintf(stderr, "[Platform_Win] ERROR: Failed to create stdout pipes\n");
@@ -247,7 +260,7 @@ bool platform::spawnProcess(string executable, vector<string> arguments,
   }
 
   // Create a pipe for the child process's stderr and ensure the read handle to the pipe is not inherited.
-  HANDLE childStderrRd = NULL, childStderrWr = NULL;
+  HANDLE childStderrRd = nullptr, childStderrWr = nullptr;
   if (!CreatePipe(&childStderrRd, &childStderrWr, &saAttr, 0))
   {
     fprintf(stderr, "[Platform_Win] ERROR: Failed to create stderr pipes\n");
@@ -260,7 +273,7 @@ bool platform::spawnProcess(string executable, vector<string> arguments,
   }
   
   // Create a pipe for the child process's stdin and ensure the write handle is not inherited. 
-  HANDLE childStdinRd = NULL, childStdinWr = NULL;
+  HANDLE childStdinRd = nullptr, childStdinWr = nullptr;
   if (!CreatePipe(&childStdinRd, &childStdinWr, &saAttr, 0))
   {
     fprintf(stderr, "[Platform_Win] ERROR: Failed to create stdin pipes\n");
@@ -293,8 +306,8 @@ bool platform::spawnProcess(string executable, vector<string> arguments,
     
   // Create the child process.
   LPSTR cmdLineStr = strdup(commandLine.c_str());
-  if (!CreateProcess(NULL, cmdLineStr, NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL,
-    &siStartInfo, &piProcInfo))
+  if (!CreateProcess(nullptr, cmdLineStr, nullptr, nullptr, true, CREATE_NO_WINDOW,
+    nullptr, nullptr, &siStartInfo, &piProcInfo))
   {
     free(cmdLineStr);
     fprintf(stderr, "[Platform_Win] ERROR: Failed to create ffmpeg process\n");
@@ -302,8 +315,8 @@ bool platform::spawnProcess(string executable, vector<string> arguments,
   }
   free(cmdLineStr);
   
-  // Close the handles to the child process thread and the stdin, stdout, and stderr pipes no longer
-  // needed by the child process.
+  // Close the handles to the child process thread and the stdin, stdout, and stderr
+  // pipes no longer needed by the child process.
   CloseHandle(piProcInfo.hThread);
   CloseHandle(childStdoutWr);
   CloseHandle(childStderrWr);
@@ -351,7 +364,8 @@ bool platform::spawnThread(runFunction func, void* context, uint64_t& threadId)
   runContext->func = func;
   runContext->context = context;
   DWORD dwThreadId = 0;
-  threadId = (uint64_t)CreateThread(NULL, 0, &runHelperWin, runContext, 0, &dwThreadId);
+  threadId = (uint64_t)CreateThread(nullptr, 0, &runHelperWin, runContext, 0,
+    &dwThreadId);
   return (threadId != 0);
 }
 
@@ -365,7 +379,7 @@ bool platform::generateUniquePipeName(string& channelName)
   // Create a name for the unique pipe
   UUID pipeId = {0};
   UuidCreate(&pipeId);
-  RPC_CSTR pipeIdStr = NULL;
+  RPC_CSTR pipeIdStr = nullptr;
   UuidToString(&pipeId, &pipeIdStr);
   channelName = "\\\\.\\pipe\\";
   channelName += (char*)pipeIdStr;
@@ -378,7 +392,7 @@ bool platform::createNamedPipeForWriting(string channelName, uint64_t& pipeId,
 {
   // Create the named pipe
   HANDLE pipe = CreateNamedPipe(channelName.c_str(), PIPE_ACCESS_OUTBOUND,
-    PIPE_TYPE_BYTE | PIPE_NOWAIT, 1, 0, 0, 0, NULL);
+    PIPE_TYPE_BYTE | PIPE_NOWAIT, 1, 0, 0, 0, nullptr);
   if (pipe == INVALID_HANDLE_VALUE)
   {
     fprintf(stderr, "[Platform_Win] ERROR: Failed to create named pipe for writing (%i)\n", GetLastError());
@@ -394,7 +408,7 @@ bool platform::createNamedPipeForWriting(string channelName, uint64_t& pipeId,
 bool platform::openNamedPipeForWriting(uint64_t pipeId, bool& opened)
 {
   // Wait for the client to connect
-  ConnectNamedPipe((HANDLE)pipeId, NULL);
+  ConnectNamedPipe((HANDLE)pipeId, nullptr);
   DWORD err = GetLastError();
   if (err == ERROR_PIPE_CONNECTED)
   {
@@ -422,8 +436,8 @@ bool platform::openNamedPipeForReading(string channelName, uint64_t& pipeId, boo
 {
   // Open the named pipe for reading
   HANDLE pipe = CreateFile(channelName.c_str(), GENERIC_READ,
-    FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING,
-    FILE_ATTRIBUTE_NORMAL, NULL);
+    FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,
+    nullptr);
   if (pipe == INVALID_HANDLE_VALUE)
   {
     fileNotFound = (GetLastError() == ERROR_FILE_NOT_FOUND);
@@ -452,7 +466,7 @@ int32_t platform::waitForData(uint64_t file, uint32_t timeoutMs)
 int32_t platform::read(uint64_t file, uint8_t* buffer, uint32_t maxLength, bool& closed)
 {
   DWORD dwRead = 0;
-  if (!ReadFile((HANDLE)file, buffer, maxLength, &dwRead, NULL))
+  if (!ReadFile((HANDLE)file, buffer, maxLength, &dwRead, nullptr))
   {
     closed = (GetLastError() == ERROR_BROKEN_PIPE);
     if (!closed)
@@ -467,7 +481,7 @@ int32_t platform::read(uint64_t file, uint8_t* buffer, uint32_t maxLength, bool&
 int32_t platform::write(uint64_t file, const uint8_t* buffer, uint32_t length)
 {
   DWORD dwWritten = 0;
-  if (!WriteFile((HANDLE)file, buffer, length, &dwWritten, NULL))
+  if (!WriteFile((HANDLE)file, buffer, length, &dwWritten, nullptr))
   {
     fprintf(stderr, "[Platform_Win] ERROR: Failed to write to file or pipe (%i)\n", GetLastError());
     return -1;
@@ -487,7 +501,7 @@ uint32_t platform::getDisplayFrequency(int32_t x, int32_t y)
   pt.x = x;
   pt.y = y;
   HMONITOR hMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
-  if (hMonitor == NULL)
+  if (hMonitor == nullptr)
   {
     fprintf(stderr, "[Platform_Win] ERROR: Failed to find monitor from point (%i, %i)\n", x, y);
     return 0;
@@ -515,11 +529,10 @@ uint32_t platform::getDisplayFrequency(int32_t x, int32_t y)
   return devMode.dmDisplayFrequency;
 }
 
-ProjectorWindow* gProjectorWindow = 0;
+ProjectorWindow* gProjectorWindow = nullptr;
 bool platform::createProjectorWindow(uint32_t x, uint32_t y)
 {
-  fprintf(stderr, "## Creating projector window\n");
-  if (gProjectorWindow != 0)
+  if (gProjectorWindow != nullptr)
   {
     fprintf(stderr, "[Platform_Win] ERROR: Projector window already exists, cannot create\n");
     return false;
@@ -535,8 +548,6 @@ bool platform::displayProjectorFrame(shared_ptr<FrameWrapper> wrapper)
 
 void platform::destroyProjectorWindow()
 {
-  fprintf(stderr, "## Destroying projector window\n");
-  gProjectorWindow->DestroyWindow();
-  gProjectorWindow = 0;
-  fprintf(stderr, "## Window destroyed\n");
+  gProjectorWindow->destroyWindow();
+  gProjectorWindow = nullptr;
 }
