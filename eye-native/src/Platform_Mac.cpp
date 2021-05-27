@@ -260,9 +260,10 @@ void platform::close(uint64_t file)
 }
 
 // The monitor functions are dummy implementations on Mac
-uint32_t platform::getDisplayFrequency(int32_t x, int32_t y)
+vector<uint32_t> platform::getDisplayFrequencies(int32_t x, int32_t y)
 {
-  return 60;
+  vector<uint32_t> dummy;
+  return dummy;
 }
 bool platform::createProjectorWindow(uint32_t x, uint32_t y)
 {

@@ -122,7 +122,8 @@ export default class Control extends React.Component<
 
     // Bind the IPC handlers and other callbacks so "this" will be defined when
     // they are invoked
-    this.onInputChange = this.onInputChange.bind(this);
+    this.onTextInputChange = this.onTextInputChange.bind(this);
+    this.onNumberInputChange = this.onNumberInputChange.bind(this);
     this.onCheckboxChange = this.onCheckboxChange.bind(this);
     this.onTextAreaChange = this.onTextAreaChange.bind(this);
     this.onStartButtonClick = this.onStartButtonClick.bind(this);
@@ -216,10 +217,19 @@ export default class Control extends React.Component<
    * Define generic input and textarea handlers that work by virtue of the fact that the
    * input element names match state field names.
    */
-  onInputChange(event: React.ChangeEvent<HTMLInputElement>) {
+
+  onTextInputChange(event: React.ChangeEvent<HTMLInputElement>) {
     if (event.target && event.target.name && event.target.value) {
       this.setState(({
         [event.target.name]: event.target.value,
+      } as unknown) as ControlState);
+    }
+  }
+
+  onNumberInputChange(event: React.ChangeEvent<HTMLInputElement>) {
+    if (event.target && event.target.name && event.target.value) {
+      this.setState(({
+        [event.target.name]: parseInt(event.target.value, 0),
       } as unknown) as ControlState);
     }
   }
@@ -507,7 +517,7 @@ export default class Control extends React.Component<
                   name="outputName"
                   value={this.state.outputName}
                   disabled={this.state.running}
-                  onChange={this.onInputChange}
+                  onChange={this.onTextInputChange}
                 />
               </div>
             </div>
@@ -520,7 +530,7 @@ export default class Control extends React.Component<
                   name="width"
                   value={this.state.width}
                   disabled={this.state.running}
-                  onChange={this.onInputChange}
+                  onChange={this.onNumberInputChange}
                 />
                 <div className={styles.videoFormatText}>x</div>
                 <input
@@ -529,7 +539,7 @@ export default class Control extends React.Component<
                   name="height"
                   value={this.state.height}
                   disabled={this.state.running}
-                  onChange={this.onInputChange}
+                  onChange={this.onNumberInputChange}
                 />
                 <div className={styles.videoFormatText}>@</div>
                 <input
@@ -538,7 +548,7 @@ export default class Control extends React.Component<
                   name="fps"
                   value={this.state.fps}
                   disabled={this.state.running}
-                  onChange={this.onInputChange}
+                  onChange={this.onNumberInputChange}
                 />
                 <div className={styles.videoFormatText}>fps</div>
               </div>
@@ -651,7 +661,7 @@ export default class Control extends React.Component<
                   type="text"
                   name="rootDirectory"
                   value={this.state.rootDirectory}
-                  onChange={this.onInputChange}
+                  onChange={this.onTextInputChange}
                 />
                 <input
                   className={styles.dirSelect}
@@ -668,7 +678,7 @@ export default class Control extends React.Component<
                   type="text"
                   name="ffmpegPath"
                   value={this.state.ffmpegPath}
-                  onChange={this.onInputChange}
+                  onChange={this.onTextInputChange}
                 />
                 <input
                   className={styles.dirSelect}
@@ -706,7 +716,7 @@ export default class Control extends React.Component<
                 type="text"
                 name="limitSeconds"
                 value={this.state.limitSeconds}
-                onChange={this.onInputChange}
+                onChange={this.onNumberInputChange}
               />
               sec
             </div>

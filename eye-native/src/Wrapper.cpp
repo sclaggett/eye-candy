@@ -15,7 +15,7 @@ Napi::Object wrapper::Init(Napi::Env env, Napi::Object exports)
 
   exports.Set("beginVideoPlayback", Napi::Function::New(env, wrapper::beginVideoPlayback));
   exports.Set("endVideoPlayback", Napi::Function::New(env, wrapper::endVideoPlayback));
-  exports.Set("getDisplayFrequency", Napi::Function::New(env, wrapper::getDisplayFrequency));
+  exports.Set("getDisplayFrequencies", Napi::Function::New(env, wrapper::getDisplayFrequencies));
 
   exports.Set("createPreviewChannel", Napi::Function::New(env, wrapper::createPreviewChannel));
   exports.Set("openPreviewChannel", Napi::Function::New(env, wrapper::openPreviewChannel));
@@ -205,7 +205,7 @@ Napi::String wrapper::endVideoPlayback(const Napi::CallbackInfo& info)
   return Napi::String::New(env, native::endVideoPlayback(env));
 }
 
-Napi::Number wrapper::getDisplayFrequency(const Napi::CallbackInfo& info)
+Napi::Int32Array wrapper::getDisplayFrequencies(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
   if ((info.Length() != 2) ||
@@ -213,11 +213,15 @@ Napi::Number wrapper::getDisplayFrequency(const Napi::CallbackInfo& info)
     !info[1].IsNumber())
   {
     Napi::TypeError::New(env, "Incorrect parameter type").ThrowAsJavaScriptException();
-    return Napi::Number::New(env, -1);
+    vector<uint32_t> empty;
+    return Napi::Int32Array::New(env, 0);
   }
   Napi::Number x = info[0].As<Napi::Number>();
   Napi::Number y = info[1].As<Napi::Number>();
-  return Napi::Number::New(env, native::getDisplayFrequency(env, x, y));
+  vector<uint32_t> displayFrequencies = native::getDisplayFrequencies(env, x, y);
+  Napi::Int32Array returnValue = Napi::Int32Array::New(env, displayFrequencies.size());
+  memcpy(returnValue.Data(), displayFrequencies.data(), sizeof(uint32_t) * displayFrequencies.size());
+  return returnValue;
 }
 
 Napi::String wrapper::createPreviewChannel(const Napi::CallbackInfo& info)

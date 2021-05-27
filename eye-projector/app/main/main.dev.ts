@@ -253,7 +253,7 @@ ipcMain.handle('detectProjector', async (_event: Event) => {
     projInfo.y = projector.bounds.y;
     projInfo.width = projector.bounds.width;
     projInfo.height = projector.bounds.height;
-    projInfo.fps = eyeNative.getDisplayFrequency(
+    projInfo.refreshRates = eyeNative.getDisplayFrequencies(
       projector.bounds.x + projector.bounds.width / 2,
       projector.bounds.y + projector.bounds.height / 2
     );

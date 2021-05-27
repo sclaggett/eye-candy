@@ -30,7 +30,7 @@ namespace wrapper
 
   Napi::String beginVideoPlayback(const Napi::CallbackInfo& info);
   Napi::String endVideoPlayback(const Napi::CallbackInfo& info);
-  Napi::Number getDisplayFrequency(const Napi::CallbackInfo& info);
+  Napi::Int32Array getDisplayFrequencies(const Napi::CallbackInfo& info);
 
   Napi::String createPreviewChannel(const Napi::CallbackInfo& info);
   Napi::String openPreviewChannel(const Napi::CallbackInfo& info);

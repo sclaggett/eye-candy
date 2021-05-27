@@ -33,7 +33,7 @@ namespace platform
   int32_t write(uint64_t file, const uint8_t* buffer, uint32_t length);
   void close(uint64_t file);
 
-  uint32_t getDisplayFrequency(int32_t x, int32_t y);
+  std::vector<uint32_t> getDisplayFrequencies(int32_t x, int32_t y);
 
   bool createProjectorWindow(uint32_t x, uint32_t y);
   bool displayProjectorFrame(std::shared_ptr<FrameWrapper> wrapper);

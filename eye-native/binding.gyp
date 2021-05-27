@@ -101,7 +101,8 @@
           "nafxcw.lib",
           "opencv_world451.lib",
           "Rpcrt4.lib",
-          "D3D11.lib"
+          "D3D11.lib",
+          "DXGI.lib"
         ],
         "copies":[
           {

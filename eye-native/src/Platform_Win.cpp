@@ -2,8 +2,11 @@
 #include <afxwin.h>
 #include <afxpriv.h>
 #include <d3d11.h>
+#include <algorithm>
 
 using namespace std;
+
+#define TARGET_FORMAT DXGI_FORMAT_R8G8B8A8_UNORM
 
 // The ProjectorWindow class is derived from CFrameWnd and handles opening a
 // fullscreen window on the projector monitor
@@ -15,6 +18,7 @@ private:
   ID3D11Device* device;
   ID3D11DeviceContext* context;
   ID3D11RenderTargetView* renderTarget;
+  uint32_t framesPerSecond;
 
 public:
   ProjectorWindow() :
@@ -22,7 +26,8 @@ public:
     swapChain(nullptr),
     device(nullptr),
     context(nullptr),
-    renderTarget(nullptr)
+    renderTarget(nullptr),
+    framesPerSecond(0)
   {
   };
   virtual ~ProjectorWindow() {};
@@ -67,7 +72,7 @@ public:
     swapChainDesc.BufferDesc.Height = projectorRect.Height();
     swapChainDesc.BufferDesc.RefreshRate.Numerator = 0;
     swapChainDesc.BufferDesc.RefreshRate.Denominator = 0;
-    swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    swapChainDesc.BufferDesc.Format = TARGET_FORMAT;
     swapChainDesc.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
     swapChainDesc.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
@@ -133,8 +138,69 @@ public:
   uint32_t temp = 0;
   bool displayFrame(shared_ptr<FrameWrapper> frame)
   {
-    // If you want the current mode, use unspecified values for all properties in FindClosestMatchingMode.
-    //DXGIOutput::FindClosestMatchingMode;
+    // Get a reference to the monitor
+    IDXGIOutput* output;
+    if (FAILED(swapChain->GetContainingOutput(&output)))
+    {
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to get monitor\n");
+      return false;
+    }
+
+    // Check the frame rate if we haven't already
+    if (framesPerSecond == 0)
+    {
+      DXGI_MODE_DESC emptyMode = {};
+      DXGI_MODE_DESC currentMode;
+      if (FAILED(output->FindClosestMatchingMode(&emptyMode, &currentMode, device)))
+      {
+        fprintf(stderr, "[Platform_Win] ERROR: Failed to get current frame rate\n");
+        return false;
+      }
+      framesPerSecond = currentMode.RefreshRate.Numerator / currentMode.RefreshRate.Denominator;
+      fprintf(stderr, "## Current frame rate: %i\n", framesPerSecond);
+    }
+
+    // Change the refresh rate if it doesn't match the current frame rate
+    if (framesPerSecond != frame->fps)
+    {
+      fprintf(stderr, "## Changing fps to %i\n", frame->fps);
+
+      DXGI_SWAP_CHAIN_DESC swapChainDesc;
+      memset(&swapChainDesc, 0, sizeof(DXGI_SWAP_CHAIN_DESC));
+      if (FAILED(swapChain->GetDesc(&swapChainDesc)))
+      {
+        fprintf(stderr, "[Platform_Win] ERROR: Failed to get swap chain description\n");
+        return false;
+      }
+      DXGI_MODE_DESC targetModeDesc;
+      memset(&targetModeDesc, 0, sizeof(DXGI_MODE_DESC));
+      targetModeDesc.Width = swapChainDesc.BufferDesc.Width;
+      targetModeDesc.Height = swapChainDesc.BufferDesc.Height;
+      targetModeDesc.RefreshRate.Numerator = frame->fps;
+      targetModeDesc.RefreshRate.Denominator = 1;
+      targetModeDesc.Format = swapChainDesc.BufferDesc.Format;
+      targetModeDesc.Scaling = swapChainDesc.BufferDesc.Scaling;
+      DXGI_MODE_DESC emptyMode = {};
+      if (FAILED(output->FindClosestMatchingMode(&emptyMode, &targetModeDesc, device)))
+      {
+        fprintf(stderr, "[Platform_Win] ERROR: Failed to find matching mode\n");
+        return false;
+      }
+      fprintf(stderr, "## Matching mode: %i/%i\n", targetModeDesc.RefreshRate.Numerator,
+        targetModeDesc.RefreshRate.Denominator);
+      if (FAILED(swapChain->ResizeTarget(&(targetModeDesc))))
+      {
+        fprintf(stderr, "[Platform_Win] ERROR: Failed to change refresh rate\n");
+        return false;
+      }
+      if (FAILED(swapChain->ResizeBuffers(0, targetModeDesc.Width, targetModeDesc.Height,
+        TARGET_FORMAT, DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH)))
+      {
+        fprintf(stderr, "[Platform_Win] ERROR: Failed to resize the swap chain\n");
+      }
+      framesPerSecond = frame->fps;
+      fprintf(stderr, "## Refresh rate changed\n");
+    }
 
     // Draw the frame
     if ((temp++ % 30) < 15)
@@ -149,8 +215,9 @@ public:
     }
 
     // Wait for vertical blank
-    IDXGIOutput* output;
-    if (FAILED(swapChain->GetContainingOutput(&output)) || FAILED(output->WaitForVBlank()))
+    HRESULT hr = output->WaitForVBlank();
+    output->Release();
+    if (FAILED(hr))
     {
       fprintf(stderr, "[Platform_Win] ERROR: Failed to wait for vsync\n");
       return false;
@@ -209,8 +276,9 @@ public:
   afx_msg void OnSize(UINT nType, int cx, int cy)
   {
     // Resize the swap chain
+    fprintf(stderr, "## OnSize()\n");
     if (swapChain && FAILED(swapChain->ResizeBuffers(0, cx, cy,
-      DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH)))
+      TARGET_FORMAT, DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH)))
     {
       fprintf(stderr, "[Platform_Win] ERROR: Failed to resize the swap chain\n");
     }
@@ -494,8 +562,10 @@ void platform::close(uint64_t file)
   CloseHandle((HANDLE)file);
 }
 
-uint32_t platform::getDisplayFrequency(int32_t x, int32_t y)
+vector<uint32_t> platform::getDisplayFrequencies(int32_t x, int32_t y)
 {
+  vector<uint32_t> displayFrequencies;
+
   // Get the monitor from the point
   POINT pt;
   pt.x = x;
@@ -504,29 +574,104 @@ uint32_t platform::getDisplayFrequency(int32_t x, int32_t y)
   if (hMonitor == nullptr)
   {
     fprintf(stderr, "[Platform_Win] ERROR: Failed to find monitor from point (%i, %i)\n", x, y);
-    return 0;
+    return displayFrequencies;
   }
 
-  // Look up the device name of the monitor
-  MONITORINFOEX monitorInfo;
-  memset(&monitorInfo, 0, sizeof(MONITORINFOEX));
-  monitorInfo.cbSize = sizeof(MONITORINFOEX);
-  if (!GetMonitorInfoA(hMonitor, &monitorInfo))
+  // Get the monitor dimensions so we can limit the modes we consider below
+  MONITORINFO monitorInfo;
+  memset(&monitorInfo, 0, sizeof(MONITORINFO));
+  monitorInfo.cbSize = sizeof(MONITORINFO);
+  if (!GetMonitorInfo(hMonitor, &monitorInfo))
   {
     fprintf(stderr, "[Platform_Win] ERROR: Failed to get monitor info\n");
-    return 0;
+    return displayFrequencies;
   }
+  uint32_t monitorWidth = monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left;
+  uint32_t monitorHeight = monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top;
 
-  // Get the display frequency
-  DEVMODE devMode;
-  memset(&devMode, 0, sizeof(DEVMODE));
-  devMode.dmSize = sizeof(DEVMODE);
-  if (!EnumDisplaySettings(monitorInfo.szDevice, ENUM_CURRENT_SETTINGS, &devMode))
+  // Create a factory and use it to enumerate over the adapters in the system
+  IDXGIFactory* factory = nullptr;
+  if (FAILED(CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)&factory)))
   {
-    fprintf(stderr, "[Platform_Win] ERROR: Failed to enumeate display settings\n");
-    return 0;
+    fprintf(stderr, "[Platform_Win] ERROR: Failed to create DirectX factory\n");
+    return displayFrequencies;
   }
-  return devMode.dmDisplayFrequency;
+  bool found = false;
+  uint32_t adapterIndex = 0;
+  while (!found)
+  {
+    IDXGIAdapter* adapter = nullptr;
+    if (FAILED(factory->EnumAdapters(adapterIndex++, &adapter)))
+    {
+      break;
+    }
+
+    // Enumerate over the outputs associated with this adapter
+    uint32_t outputIndex = 0;
+    while (!found)
+    {
+      IDXGIOutput* output = nullptr;
+      if (FAILED(adapter->EnumOutputs(outputIndex++, &output)))
+      {
+        break;
+      }
+
+      // Check the description of the output and see if it's associated with the
+      // monitor handle that we're looking for
+      DXGI_OUTPUT_DESC outputDesc;
+      memset(&outputDesc, 0, sizeof(DXGI_OUTPUT_DESC));
+      if (FAILED(output->GetDesc(&outputDesc)))
+      {
+        fprintf(stderr, "[Platform_Win] ERROR: Failed to get output description\n");
+        return displayFrequencies;
+      }
+      if (outputDesc.Monitor == hMonitor)
+      {
+        // We found the output that corresponds to the desired monitor. Get a list of
+        // display modes that match the current resolution and run at an integer number
+        // of frames per second
+        found = true;
+        UINT numModes = 0;
+        if (FAILED(output->GetDisplayModeList(TARGET_FORMAT, 0, &numModes, 0)))
+        {
+          fprintf(stderr, "[Platform_Win] ERROR: Failed to get display mode count\n");
+          return displayFrequencies;
+        }
+        DXGI_MODE_DESC* modeDescs = new DXGI_MODE_DESC[numModes];
+        if (FAILED(output->GetDisplayModeList(TARGET_FORMAT, 0, &numModes, modeDescs)))
+        {
+          fprintf(stderr, "[Platform_Win] ERROR: Failed to get display mode list\n");
+          return displayFrequencies;
+        }
+        for (uint32_t i = 0; i < numModes; ++i)
+        {
+          if ((modeDescs[i].Width != monitorWidth) ||
+            (modeDescs[i].Height != monitorHeight))
+          {
+            continue;
+          }
+          if (modeDescs[i].RefreshRate.Numerator % modeDescs[i].RefreshRate.Denominator)
+          {
+            continue;
+          }
+          uint32_t fps = modeDescs[i].RefreshRate.Numerator /
+            modeDescs[i].RefreshRate.Denominator;
+          if (find(displayFrequencies.begin(), displayFrequencies.end(), fps) !=
+            displayFrequencies.end())
+          {
+            continue;
+          }
+          displayFrequencies.push_back(fps);
+        }
+        delete [] modeDescs;
+      }
+      output->Release();
+    }
+    adapter->Release();
+  }
+  factory->Release();
+  sort(displayFrequencies.begin(), displayFrequencies.end());
+  return displayFrequencies;
 }
 
 ProjectorWindow* gProjectorWindow = nullptr;

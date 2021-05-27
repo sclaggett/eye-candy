@@ -213,9 +213,9 @@ string native::endVideoPlayback(Napi::Env env)
   return "";
 }
 
-uint32_t native::getDisplayFrequency(Napi::Env env, int32_t x, int32_t y)
+vector<uint32_t> native::getDisplayFrequencies(Napi::Env env, int32_t x, int32_t y)
 {
-  return platform::getDisplayFrequency(x, y);
+  return platform::getDisplayFrequencies(x, y);
 }
 
 string native::createPreviewChannel(Napi::Env env, string& channelName)

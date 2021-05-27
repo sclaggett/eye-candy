@@ -48,7 +48,7 @@ type ControlState = {
   projY: number;
   projWidth: number;
   projHeight: number;
-  projFps: number;
+  projRefreshRates: number[];
 
   // Log messages
   log: string;
@@ -105,7 +105,7 @@ export default class Control extends React.Component<
       projDetected: false,
       projWidth: 0,
       projHeight: 0,
-      projFps: 0,
+      projRefreshRates: [],
       log: '',
       running: false,
       runElapsedMs: 0,
@@ -126,7 +126,8 @@ export default class Control extends React.Component<
 
     // Bind the IPC handlers and other callbacks so "this" will be defined when
     // they are invoked
-    this.onInputChange = this.onInputChange.bind(this);
+    this.onTextInputChange = this.onTextInputChange.bind(this);
+    this.onNumberInputChange = this.onNumberInputChange.bind(this);
     this.onCheckboxChange = this.onCheckboxChange.bind(this);
     this.onTextAreaChange = this.onTextAreaChange.bind(this);
     this.onVideoListUpdate = this.onVideoListUpdate.bind(this);
@@ -245,10 +246,18 @@ export default class Control extends React.Component<
    * Define generic input and textarea handlers that work by virtue of the fact that the
    * input element names match state field names.
    */
-  onInputChange(event: React.ChangeEvent<HTMLInputElement>) {
+  onTextInputChange(event: React.ChangeEvent<HTMLInputElement>) {
     if (event.target && event.target.name && event.target.value) {
       this.setState(({
         [event.target.name]: event.target.value,
+      } as unknown) as ControlState);
+    }
+  }
+
+  onNumberInputChange(event: React.ChangeEvent<HTMLInputElement>) {
+    if (event.target && event.target.name && event.target.value) {
+      this.setState(({
+        [event.target.name]: parseInt(event.target.value, 10),
       } as unknown) as ControlState);
     }
   }
@@ -319,7 +328,7 @@ export default class Control extends React.Component<
             projY: projector.y,
             projWidth: projector.width,
             projHeight: projector.height,
-            projFps: projector.fps,
+            projRefreshRates: projector.refreshRates,
           });
         } else {
           this.setState({
@@ -555,7 +564,14 @@ export default class Control extends React.Component<
       this.state.projDetected === false;
     let projInfo = '';
     if (this.state.projDetected) {
-      projInfo = `${this.state.projWidth} x ${this.state.projHeight} at ${this.state.projFps} fps`;
+      let refreshRates = '';
+      for (let i = 0; i < this.state.projRefreshRates.length; i += 1) {
+        if (refreshRates.length !== 0) {
+          refreshRates += ', ';
+        }
+        refreshRates += this.state.projRefreshRates[i];
+      }
+      projInfo = `${this.state.projWidth} x ${this.state.projHeight} at [${refreshRates}] fps`;
     } else {
       projInfo = 'Not detected';
     }
@@ -584,7 +600,7 @@ export default class Control extends React.Component<
               name="outputName"
               value={this.state.outputName}
               disabled={this.state.running}
-              onChange={this.onInputChange}
+              onChange={this.onTextInputChange}
             />
           </div>
           <input
@@ -712,7 +728,7 @@ export default class Control extends React.Component<
                   type="text"
                   name="rootDirectory"
                   value={this.state.rootDirectory}
-                  onChange={this.onInputChange}
+                  onChange={this.onTextInputChange}
                 />
                 <input
                   className={styles.dirSelect}
@@ -729,7 +745,7 @@ export default class Control extends React.Component<
                   type="text"
                   name="ffmpegPath"
                   value={this.state.ffmpegPath}
-                  onChange={this.onInputChange}
+                  onChange={this.onTextInputChange}
                 />
                 <input
                   className={styles.dirSelect}
@@ -745,7 +761,7 @@ export default class Control extends React.Component<
                 type="text"
                 name="projectorLatency"
                 value={this.state.projectorLatency}
-                onChange={this.onInputChange}
+                onChange={this.onNumberInputChange}
               />
               ms
             </div>

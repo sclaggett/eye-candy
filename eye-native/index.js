@@ -98,11 +98,11 @@ function endVideoPlayback() {
   return native.endVideoPlayback();
 }
 
-function getDisplayFrequency(x, y) {
+function getDisplayFrequencies(x, y) {
   if (native === null) {
     throw new Error('Native module has not been initialized');
   }
-  return native.getDisplayFrequency(x, y);
+  return native.getDisplayFrequencies(x, y);
 }
 
 /**
@@ -151,7 +151,7 @@ module.exports = {
   closeVideoOutput,
   beginVideoPlayback,
   endVideoPlayback,
-  getDisplayFrequency,
+  getDisplayFrequencies,
   createPreviewChannel,
   openPreviewChannel,
   getNextFrame,
