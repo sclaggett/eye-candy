@@ -16,12 +16,12 @@ public:
 public:
   bool isProcessRunning();
   void waitForExit();
+  void terminateProcess();
 
   std::string readStdout();
 
 private:
   bool startProcess();
-  void terminateProcess();
   void cleanUpProcess();
   std::vector<std::string> splitString(std::string str,std::string sep);
 

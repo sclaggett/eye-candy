@@ -2,21 +2,32 @@
 #include "FfmpegPlaybackProcess.h"
 #include "FfprobeProcess.h"
 #include "Platform.h"
+#include "PreviewSendThread.h"
+#include "ProjectorThread.h"
 #include <sstream>
 
 using namespace std;
 
-PlaybackThread::PlaybackThread(vector<string> vids,
-    shared_ptr<Queue<shared_ptr<FrameWrapper>>> outputQueue, string ffmpeg,
-    string ffprobe, wrapper::JsCallback* log, wrapper::JsCallback* duration) :
+PlaybackThread::PlaybackThread(uint32_t x1, uint32_t y1, vector<string> vids,
+    bool scale, string ffmpeg, string ffprobe, wrapper::JsCallback* log,
+    wrapper::JsCallback* duration, wrapper::JsCallback* position) :
   Thread("playback"),
+  x(x1),
+  y(y1),
   videos(vids),
-  outputFrameQueue(outputQueue),
+  scaleToFit(scale),
   ffmpegPath(ffmpeg),
   ffprobePath(ffprobe),
   logCallback(log),
-  durationCallback(duration)
+  durationCallback(duration),
+  positionCallback(position)
 {
+}
+
+void PlaybackThread::setPreviewChannel(string name)
+{
+  unique_lock<mutex> lock(channelMutex);
+  channelName = name;
 }
 
 string PlaybackThread::formatDuration(uint32_t durationSec)
@@ -83,6 +94,44 @@ uint32_t PlaybackThread::run()
     }
   }
 
+  // Examine the monitor's supported refresh rates and the frame rate of each video to
+  // determine the refresh rate we should use
+  vector<uint32_t> displayFrequencies = platform::getDisplayFrequencies(x, y);
+  for (uint32_t i = 0; i < videos.size(); ++i)
+  {
+    uint32_t fps = videoFps.at(i);
+    auto it = displayFrequencies.begin();
+    while (it != displayFrequencies.end())
+    {
+      uint32_t displayFreq = *it;
+      uint32_t n;
+      for (n = 1; n < 5; ++n)
+      {
+        if (((displayFreq % n) == 0) && ((displayFreq / n) == fps))
+        {
+          break;
+        }
+      }
+      if (n == 5)
+      {
+        it = displayFrequencies.erase(it);
+      }
+      else
+      {
+        ++it;
+      }
+    }
+  }
+  if (displayFrequencies.empty())
+  {
+    wrapper::invokeJsCallback(logCallback, 
+      "ERROR: Invalidate combination of monitor refresh rates and video frame rates.\n");
+    wrapper::invokeJsCallback(durationCallback, 0);
+    wrapper::invokeJsCallback(positionCallback, 0);
+    return 1;
+  }
+  uint32_t monitorRefreshRate = displayFrequencies.at(0);
+
   // Notify the javascript of the total duration
   wrapper::invokeJsCallback(durationCallback, totalDurationMs);
   {
@@ -91,9 +140,26 @@ uint32_t PlaybackThread::run()
     wrapper::invokeJsCallback(logCallback, message.str());
   }
 
+  // Spawn the projector thread that will take the frames in the pending frames
+  // queue, display they in sync with the monitor's vertical refresh, and move
+  // them on to the preview frames queue
+  shared_ptr<Queue<shared_ptr<FrameWrapper>>> pendingFrameQueue(
+    new Queue<shared_ptr<FrameWrapper>>());
+  shared_ptr<Queue<shared_ptr<FrameWrapper>>> previewFrameQueue(
+    new Queue<shared_ptr<FrameWrapper>>());
+  ProjectorThread* projectorThread = new ProjectorThread(x, y, scaleToFit, monitorRefreshRate,
+    pendingFrameQueue, previewFrameQueue, logCallback, positionCallback);
+  projectorThread->spawn();
+
+  // Spawn the preview send thread that will transmit the frames from the preview
+  // frames queue to the renderer process. Pass null in for the output queue so
+  // the preview send thread will discard each frame when finished
+  PreviewSendThread* previewSendThread = new PreviewSendThread(previewFrameQueue, nullptr);
+  previewSendThread->spawn();
+
   // Video playback loop
   double timestampSec = 0;
-  for (uint32_t i = 0; i < videos.size(); ++i)
+  for (uint32_t i = 0; (i < videos.size()) && !checkForExit(); ++i)
   {
     // Get video details
     string video = videos.at(i);
@@ -119,7 +185,7 @@ uint32_t PlaybackThread::run()
       // Pause here and sleep if the output queue is full, i.e. contains a full 5 seconds
       // worth of frames. This is necessary because we read frames from ffmpeg much faster
       // than we project them and don't want to run out of memory
-      if (outputFrameQueue->size() >= (5 * fps))
+      if (pendingFrameQueue->size() >= (5 * fps))
       {
         platform::sleep(5);
         continue;
@@ -133,7 +199,8 @@ uint32_t PlaybackThread::run()
         continue;
       }
 
-      // Convert the stream of data from ffmpeg into discreet frames
+      // Convert the stream of data from ffmpeg into discreet frames and pass them
+      // to the pending frames queue
       while (!data.empty())
       {
         if (wrapper == 0)
@@ -158,26 +225,72 @@ uint32_t PlaybackThread::run()
         wrapper->nativeLength += bytesToCopy;
         if (wrapper->nativeLength == frameSize)
         {
-          outputFrameQueue->addItem(wrapper);
+          pendingFrameQueue->addItem(wrapper);
           frameNumber += 1;
           timestampSec += 1.0 / fps;
           wrapper = 0;
         }
         data = data.substr(bytesToCopy);
       }
+
+      // Pass the preview channel name to the send thread
+      {
+        unique_lock<mutex> lock(channelMutex);
+        if (!channelName.empty())
+        {
+          previewSendThread->setPreviewChannel(channelName);
+          channelName.clear();
+        }
+      }
     }
 
     // Stop ffmpeg
     if (ffmpegProcess->isProcessRunning())
     {
-      ffmpegProcess->waitForExit();
+      if (!checkForExit())
+      {
+        ffmpegProcess->waitForExit();
+      }
+      else
+      {
+        ffmpegProcess->terminateProcess();
+      }
     }
     delete ffmpegProcess;
+    if (!checkForExit())
     {
       stringstream message;
       message << "Decoding of video file " << to_string(i + 1) << " complete." << endl;
       wrapper::invokeJsCallback(logCallback, message.str());
     }
   }
+
+  // Wait until the pending and preview frame queues have drained
+  while (!checkForExit() && 
+    (!pendingFrameQueue->empty() || !previewFrameQueue->empty()))
+  {
+    platform::sleep(5);
+  }
+
+  // Shut down the projector and preview send threads
+  if (projectorThread->isRunning())
+  {
+    projectorThread->terminate();
+  }
+  delete projectorThread;
+  if (previewSendThread->isRunning())
+  {
+    previewSendThread->terminate();
+  }
+  delete previewSendThread;
+  pendingFrameQueue = nullptr;
+  previewFrameQueue = nullptr;
   return 0;
+}
+
+bool PlaybackThread::terminate(uint32_t timeout /*= 100*/)
+{
+  // It can take longer than 100 ms for the projector thread to shut down so
+  // wait for up to a full second
+  return Thread::terminate(1000);
 }

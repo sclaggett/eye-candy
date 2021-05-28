@@ -4,13 +4,14 @@
 using namespace std;
 
 ProjectorThread::ProjectorThread(int32_t xi, int32_t yi, bool scale,
-    shared_ptr<Queue<shared_ptr<FrameWrapper>>> inputQueue,
+    uint32_t refresh, shared_ptr<Queue<shared_ptr<FrameWrapper>>> inputQueue,
     shared_ptr<Queue<shared_ptr<FrameWrapper>>> outputQueue,
     wrapper::JsCallback* log, wrapper::JsCallback* position) :
   Thread("projector"),
   x(xi),
   y(yi),
   scaleToFit(scale),
+  refreshRate(refresh),
   inputFrameQueue(inputQueue),
   outputFrameQueue(outputQueue),
   logCallback(log),
@@ -20,7 +21,7 @@ ProjectorThread::ProjectorThread(int32_t xi, int32_t yi, bool scale,
 
 uint32_t ProjectorThread::run()
 {
-  if (!platform::createProjectorWindow(x, y))
+  if (!platform::createProjectorWindow(x, y, refreshRate))
   {
     wrapper::invokeJsCallback(logCallback, "ERROR: Failed to create projector window.\n");
     return 1;

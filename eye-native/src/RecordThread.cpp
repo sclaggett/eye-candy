@@ -1,5 +1,6 @@
 #include "RecordThread.h"
 #include "FfmpegRecordProcess.h"
+#include "PreviewSendThread.h"
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -21,6 +22,12 @@ RecordThread::RecordThread(shared_ptr<Queue<shared_ptr<FrameWrapper>>> inputQueu
 {
 }
 
+void RecordThread::setPreviewChannel(string name)
+{
+  unique_lock<mutex> lock(channelMutex);
+  channelName = name;
+}
+
 uint32_t RecordThread::run()
 {
   // Spawn the ffmpeg process
@@ -28,8 +35,16 @@ uint32_t RecordThread::run()
     width, height, fps, outputPath);
   ffmpegProcess->spawn();
 
+  // Create the preview frame queue and spawn the preview send thread
+  shared_ptr<Queue<shared_ptr<FrameWrapper>>> previewFrameQueue(
+    new Queue<shared_ptr<FrameWrapper>>());
+  PreviewSendThread* previewSendThread = new PreviewSendThread(previewFrameQueue,
+    outputFrameQueue);
+  previewSendThread->spawn();
+
   while (!checkForExit())
   {
+    // Wait for the next frame
     shared_ptr<FrameWrapper> wrapper;
     if (!inputFrameQueue->waitItem(&wrapper, 10))
     {
@@ -50,20 +65,36 @@ uint32_t RecordThread::run()
       length = wrapper->electronLength;
     }
 
-    // Write the raw frame to the ffmpeg process and add it to the output queue
+    // Write the raw frame to the ffmpeg process
     if (!ffmpegProcess->writeStdin(data, length))
     {
       printf("[FrameThread] ERROR: Failed to write to FFmpeg\n");
       break;
     }
-    outputFrameQueue->addItem(wrapper);
+
+    // Pass the preview channel name and frame to the send thread
+    {
+      unique_lock<mutex> lock(channelMutex);
+      if (!channelName.empty())
+      {
+        previewSendThread->setPreviewChannel(channelName);
+        channelName.clear();
+      }
+    }
+    previewFrameQueue->addItem(wrapper);
   }
 
-  // Stop ffmpeg
+  // Stop ffmpeg and the preview send thread
   if (ffmpegProcess->isProcessRunning())
   {
     ffmpegProcess->waitForExit();
   }
   delete ffmpegProcess;
+  if (previewSendThread->isRunning())
+  {
+    previewSendThread->terminate();
+  }
+  delete previewSendThread;
+  previewFrameQueue = nullptr;
   return 0;
 }

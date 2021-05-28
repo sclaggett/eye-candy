@@ -265,7 +265,7 @@ vector<uint32_t> platform::getDisplayFrequencies(int32_t x, int32_t y)
   vector<uint32_t> dummy;
   return dummy;
 }
-bool platform::createProjectorWindow(uint32_t x, uint32_t y)
+bool platform::createProjectorWindow(uint32_t x, uint32_t y, uint32_t refreshRate)
 {
   return true;
 }

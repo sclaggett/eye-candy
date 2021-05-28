@@ -32,7 +32,7 @@ public:
   };
   virtual ~ProjectorWindow() {};
 
-  bool createWindow(uint32_t x, uint32_t y)
+  bool createWindow(uint32_t x, uint32_t y, uint32_t refreshRate)
   {
     // Get the monitor from the point
     POINT pt;
@@ -70,8 +70,8 @@ public:
     swapChainDesc.BufferCount = 2;
     swapChainDesc.BufferDesc.Width = projectorRect.Width();
     swapChainDesc.BufferDesc.Height = projectorRect.Height();
-    swapChainDesc.BufferDesc.RefreshRate.Numerator = 0;
-    swapChainDesc.BufferDesc.RefreshRate.Denominator = 0;
+    swapChainDesc.BufferDesc.RefreshRate.Numerator = refreshRate;
+    swapChainDesc.BufferDesc.RefreshRate.Denominator = 1;
     swapChainDesc.BufferDesc.Format = TARGET_FORMAT;
     swapChainDesc.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
     swapChainDesc.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
@@ -98,10 +98,8 @@ public:
       fprintf(stderr, "[Platform_Win] ERROR: Failed to get fullscreen state\n");
       return false;
     }
-    fprintf(stderr, "## Fullscreen: %i\n", fullscreen);
     if (!fullscreen)
     {
-    fprintf(stderr, "## Switching to fullscreen\n");
       swapChain->SetFullscreenState(true, nullptr);
     }
 
@@ -146,6 +144,7 @@ public:
       return false;
     }
 
+    /*
     // Check the frame rate if we haven't already
     if (framesPerSecond == 0)
     {
@@ -201,6 +200,7 @@ public:
       framesPerSecond = frame->fps;
       fprintf(stderr, "## Refresh rate changed\n");
     }
+    */
 
     // Draw the frame
     if ((temp++ % 30) < 15)
@@ -276,7 +276,6 @@ public:
   afx_msg void OnSize(UINT nType, int cx, int cy)
   {
     // Resize the swap chain
-    fprintf(stderr, "## OnSize()\n");
     if (swapChain && FAILED(swapChain->ResizeBuffers(0, cx, cy,
       TARGET_FORMAT, DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH)))
     {
@@ -675,7 +674,7 @@ vector<uint32_t> platform::getDisplayFrequencies(int32_t x, int32_t y)
 }
 
 ProjectorWindow* gProjectorWindow = nullptr;
-bool platform::createProjectorWindow(uint32_t x, uint32_t y)
+bool platform::createProjectorWindow(uint32_t x, uint32_t y, uint32_t refreshRate)
 {
   if (gProjectorWindow != nullptr)
   {
@@ -683,7 +682,7 @@ bool platform::createProjectorWindow(uint32_t x, uint32_t y)
     return false;
   }
   gProjectorWindow = new ProjectorWindow();
-  return gProjectorWindow->createWindow(x, y);
+  return gProjectorWindow->createWindow(x, y, refreshRate);
 }
 
 bool platform::displayProjectorFrame(shared_ptr<FrameWrapper> wrapper)

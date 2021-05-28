@@ -9,22 +9,31 @@
 class PlaybackThread : public Thread
 {
 public:
-  PlaybackThread(std::vector<std::string> videos,
-    std::shared_ptr<Queue<std::shared_ptr<FrameWrapper>>> outputFrameQueue,
-    std::string ffmpegPath, std::string ffprobePath,
-    wrapper::JsCallback* logCallback, wrapper::JsCallback* durationCallback);
+  PlaybackThread(uint32_t x, uint32_t y, std::vector<std::string> videos,
+    bool scaleToFit, std::string ffmpegPath, std::string ffprobePath,
+    wrapper::JsCallback* logCallback, wrapper::JsCallback* durationCallback,
+    wrapper::JsCallback* positionCallback);
   virtual ~PlaybackThread() {};
 
+  void setPreviewChannel(std::string channelName);
+
   uint32_t run();
+
+  bool terminate(uint32_t timeout = 100);
 
 private:
   std::string formatDuration(uint32_t duration);
 
 private:
+  uint32_t x;
+  uint32_t y;
   std::vector<std::string> videos;
-  std::shared_ptr<Queue<std::shared_ptr<FrameWrapper>>> outputFrameQueue;
+  bool scaleToFit;
   std::string ffmpegPath;
   std::string ffprobePath;
   wrapper::JsCallback* logCallback;
   wrapper::JsCallback* durationCallback;
+  wrapper::JsCallback* positionCallback;
+  std::string channelName;
+  std::mutex channelMutex;
 };

@@ -2,8 +2,6 @@
 #include "Platform.h"
 #include "PlaybackThread.h"
 #include "PreviewReceiveThread.h"
-#include "PreviewSendThread.h"
-#include "ProjectorThread.h"
 #include "RecordThread.h"
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -18,13 +16,10 @@ wrapper::JsCallback* gLogCallback = 0;
 bool gInitialized = false, gRecording = false, gPlaying = false;
 uint32_t gNextFrameId = 0, gWidth = 0, gHeight = 0;
 shared_ptr<Queue<shared_ptr<FrameWrapper>>> gPendingFrameQueue(new Queue<shared_ptr<FrameWrapper>>());
-shared_ptr<Queue<shared_ptr<FrameWrapper>>> gPreviewFrameQueue(new Queue<shared_ptr<FrameWrapper>>());
 shared_ptr<Queue<shared_ptr<FrameWrapper>>> gCompletedFrameQueue(new Queue<shared_ptr<FrameWrapper>>());
 shared_ptr<Queue<Mat*>> gPendingPreviewQueue(new Queue<Mat*>());
 shared_ptr<RecordThread> gRecordThread(nullptr);
 shared_ptr<PlaybackThread> gPlaybackThread(nullptr);
-shared_ptr<ProjectorThread> gProjectorThread(nullptr);
-shared_ptr<PreviewSendThread> gPreviewSendThread(nullptr);
 shared_ptr<PreviewReceiveThread> gPreviewReceiveThread(nullptr);
 
 void native::initialize(Napi::Env env, string ffmpegPath, string ffprobePath,
@@ -52,16 +47,11 @@ string native::createVideoOutput(Napi::Env env, int width, int height, int fps, 
   gHeight = height;
 
   // Spawn the recording thread that will create the ffmpeg process, feed it frames as
-  // we place them in the pending frames queue, and move them on to the preview frames queue
+  // we place them in the pending frames queue, optionally transmit those frames to the
+  // renderer process, and finally move them into the completed frames queue
   gRecordThread = shared_ptr<RecordThread>(new RecordThread(gPendingFrameQueue,
-    gPreviewFrameQueue, gFfmpegPath, gWidth, gHeight, fps, outputPath));
+    gCompletedFrameQueue, gFfmpegPath, gWidth, gHeight, fps, outputPath));
   gRecordThread->spawn();
-
-  // Spawn the preview send thread that will transmit the frames from the preview
-  // frames queue to the renderer process and move them into the completed frames queue
-  gPreviewSendThread = shared_ptr<PreviewSendThread>(new PreviewSendThread(
-    gPreviewFrameQueue, gCompletedFrameQueue));
-  gPreviewSendThread->spawn();
 
   gRecording = true;
   return "";
@@ -128,14 +118,6 @@ void native::closeVideoOutput(Napi::Env env)
     }
     gRecordThread = nullptr;
   }
-  if (gPreviewSendThread != nullptr)
-  {
-    if (gPreviewSendThread->isRunning())
-    {
-      gPreviewSendThread->terminate();
-    }
-    gPreviewSendThread = nullptr;
-  }
   gRecording = false;
 }
 
@@ -155,25 +137,10 @@ string native::beginVideoPlayback(Napi::Env env, int32_t x, int32_t y,
 
   // Spawn the playback thread that will create the ffmpeg processes, read the
   // frames as they are decoded, and store then in the pending frames queue
-  gPlaybackThread = shared_ptr<PlaybackThread>(new PlaybackThread(videos,
-    gPendingFrameQueue, gFfmpegPath, gFfprobePath, gLogCallback,
-    durationCallback));
+  gPlaybackThread = shared_ptr<PlaybackThread>(new PlaybackThread(x, y,
+    videos, scaleToFit, gFfmpegPath, gFfprobePath, gLogCallback,
+    durationCallback, positionCallback));
   gPlaybackThread->spawn();
-
-  // Spawn the projector thread that will take the frames in the pending frames
-  // queue, display they in sync with the monitor's vertical refresh, and move
-  // them on to the preview frames queue
-  gProjectorThread = shared_ptr<ProjectorThread>(new ProjectorThread(x, y,
-    scaleToFit, gPendingFrameQueue, gPreviewFrameQueue, gLogCallback,
-    positionCallback));
-  gProjectorThread->spawn();
-
-  // Spawn the preview send thread that will transmit the frames from the preview
-  // frames queue to the renderer process. Pass null in for the output queue so
-  // the preview send thread will discard each frame when finished
-  gPreviewSendThread = shared_ptr<PreviewSendThread>(new PreviewSendThread(
-    gPreviewFrameQueue, nullptr));
-  gPreviewSendThread->spawn();
 
   gPlaying = true;
   return "";
@@ -193,22 +160,6 @@ string native::endVideoPlayback(Napi::Env env)
     }
     gPlaybackThread = nullptr;
   }
-  if (gProjectorThread != nullptr)
-  {
-    if (gProjectorThread->isRunning())
-    {
-      gProjectorThread->terminate();
-    }
-    gProjectorThread = nullptr;
-  }
-  if (gPreviewSendThread != nullptr)
-  {
-    if (gPreviewSendThread->isRunning())
-    {
-      gPreviewSendThread->terminate();
-    }
-    gPreviewSendThread = nullptr;
-  }
   gPlaying = false;
   return "";
 }
@@ -220,18 +171,25 @@ vector<uint32_t> native::getDisplayFrequencies(Napi::Env env, int32_t x, int32_t
 
 string native::createPreviewChannel(Napi::Env env, string& channelName)
 {
-  // Make sure the preview send thread is running
-  if (gPreviewSendThread == nullptr)
+  // Make sure either the record or playback threads are running
+  if ((gRecordThread == nullptr) && (gPlaybackThread == nullptr))
   {
     return "Create video input or output before preview channel";
   }
 
-  // Generate a unique pipe name and pass it to the preview send thread
+  // Generate a unique pipe name and pass it to the record or playback threads
   if (!platform::generateUniquePipeName(channelName))
   {
     return "Failed to create uniquely named pipe";
   }
-  gPreviewSendThread->setPreviewChannel(channelName);
+  if (gRecordThread != nullptr)
+  {
+    gRecordThread->setPreviewChannel(channelName);
+  }
+  if (gPlaybackThread != nullptr)
+  {
+    gPlaybackThread->setPreviewChannel(channelName);
+  }
   return "";
 }
 
