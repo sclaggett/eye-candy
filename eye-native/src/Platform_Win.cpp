@@ -1,10 +1,14 @@
 #include "Platform.h"
 #include <afxwin.h>
 #include <afxpriv.h>
+#include <comdef.h>
 #include <d3d11.h>
+#include <d2d1_3.h>
 #include <algorithm>
+#include <wrl.h>
 
 using namespace std;
+using namespace Microsoft::WRL;
 
 #define TARGET_FORMAT DXGI_FORMAT_R8G8B8A8_UNORM
 
@@ -14,22 +18,19 @@ class ProjectorWindow : public CFrameWnd
 {
 private:
   HMONITOR hMonitor;
-  IDXGISwapChain* swapChain;
-  ID3D11Device* device;
-  ID3D11DeviceContext* context;
-  ID3D11RenderTargetView* renderTarget;
-  uint32_t framesPerSecond;
+  ComPtr<ID3D11Device> d3dDevice;
+  ComPtr<ID3D11DeviceContext> d3dContext;
+  ComPtr<IDXGISwapChain> dxgiSwapChain;
+  ComPtr<ID3D11RenderTargetView> d3dRenderTargetView;
+  ComPtr<ID2D1Factory> d2dFactory;
+  ComPtr<ID2D1Device2> d2dDevice;
+  ComPtr<ID2D1DeviceContext> d2dContext;
+  ComPtr<IDXGIDevice> dxgiDevice;
+  ComPtr<ID2D1RenderTarget> d2dRenderTarget;
+  ComPtr<ID2D1Bitmap1> d2dTargetBitmap;
 
 public:
-  ProjectorWindow() :
-    hMonitor(nullptr),
-    swapChain(nullptr),
-    device(nullptr),
-    context(nullptr),
-    renderTarget(nullptr),
-    framesPerSecond(0)
-  {
-  };
+  ProjectorWindow() {};
   virtual ~ProjectorWindow() {};
 
   bool createWindow(uint32_t x, uint32_t y, uint32_t refreshRate)
@@ -64,14 +65,18 @@ public:
     }
     ShowWindow(SW_SHOW);
 
+    // TODO: enumerate display modes, and initialize the swap chain description correctly before
+    // you create the swap chain. This will ensure maximum performance when flipping in full-screen
+    // mode and avoid the extra memory overhead.
+
     // Create the swap chain
     DXGI_SWAP_CHAIN_DESC swapChainDesc;
     memset(&swapChainDesc, 0, sizeof(DXGI_SWAP_CHAIN_DESC));
     swapChainDesc.BufferCount = 2;
     swapChainDesc.BufferDesc.Width = projectorRect.Width();
     swapChainDesc.BufferDesc.Height = projectorRect.Height();
-    swapChainDesc.BufferDesc.RefreshRate.Numerator = refreshRate;
-    swapChainDesc.BufferDesc.RefreshRate.Denominator = 1;
+    swapChainDesc.BufferDesc.RefreshRate.Numerator = 0;
+    swapChainDesc.BufferDesc.RefreshRate.Denominator = 0;
     swapChainDesc.BufferDesc.Format = TARGET_FORMAT;
     swapChainDesc.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
     swapChainDesc.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
@@ -79,78 +84,280 @@ public:
     swapChainDesc.SampleDesc.Count = 1;
     swapChainDesc.SampleDesc.Quality = 0;
     swapChainDesc.OutputWindow = m_hWnd;
-    swapChainDesc.Windowed = TRUE;
+    swapChainDesc.Windowed = true;
     swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-    swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+    swapChainDesc.Flags = 0;  //DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
     if (FAILED(D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE,
-      nullptr, 0, nullptr, 0, D3D11_SDK_VERSION, &swapChainDesc, &swapChain, &device,
-      nullptr, &context)))
+      nullptr, D3D11_CREATE_DEVICE_BGRA_SUPPORT, nullptr, 0, D3D11_SDK_VERSION, &swapChainDesc,
+      &dxgiSwapChain, &d3dDevice, nullptr, &d3dContext)))
     {
       fprintf(stderr, "[Platform_Win] ERROR: Failed to create swap chain\n");
       return false;
     }
 
-    // Detect if newly created full-screen swap chain isn't actually full screen. Note
-    // that the app is fullscreen given the way that we're creating it.
+    /*
+    // Detect if newly created full-screen swap chain isn't actually full screen and make it so
     BOOL fullscreen;
-    if (FAILED(swapChain->GetFullscreenState(&fullscreen, nullptr)))
+    if (FAILED(dxgiSwapChain->GetFullscreenState(&fullscreen, nullptr)))
     {
       fprintf(stderr, "[Platform_Win] ERROR: Failed to get fullscreen state\n");
       return false;
     }
     if (!fullscreen)
     {
-      swapChain->SetFullscreenState(true, nullptr);
+      dxgiSwapChain->SetFullscreenState(true, nullptr);
     }
+    */
 
-    // Create back buffer
-    ID3D11Texture2D* backBuffer = nullptr;
-    if (FAILED(swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBuffer)))
+    // Get buffer and create a render-target-view
+    ComPtr<ID3D11Resource> backBuffer;
+    if (FAILED(dxgiSwapChain->GetBuffer(0, __uuidof(ID3D11Resource), (LPVOID*)&backBuffer)))
     {
       fprintf(stderr, "[Platform_Win] ERROR: Failed to get back buffer\n");
       return false;
     }
-
-    // Initialize the viewport
-    D3D11_VIEWPORT viewport;
-    viewport.Width = (FLOAT)projectorRect.Width();
-    viewport.Height = (FLOAT)projectorRect.Height();
-    viewport.MinDepth = 0.0f;
-    viewport.MaxDepth = 1.0f;
-    viewport.TopLeftX = 0;
-    viewport.TopLeftY = 0;
-    context->RSSetViewports(1, &viewport);
-
-    // Create render target
-    HRESULT res = device->CreateRenderTargetView(backBuffer, nullptr, &renderTarget);
-    backBuffer->Release();
+    HRESULT res = d3dDevice->CreateRenderTargetView(backBuffer.Get(), nullptr, &d3dRenderTargetView);
     if (FAILED(res))
     {
       fprintf(stderr, "[Platform_Win] ERROR: Failed to create view\n");
       return false;
     }
-    context->OMSetRenderTargets(1, &renderTarget, nullptr);
+    d3dContext->OMSetRenderTargets(1, d3dRenderTargetView.GetAddressOf(), nullptr);
+
+    // Bind viewport
+    D3D11_VIEWPORT viewport;
+    viewport.Width = projectorRect.Width();
+    viewport.Height = projectorRect.Height();
+    viewport.MinDepth = 0.0f;
+    viewport.MaxDepth = 1.0f;
+    viewport.TopLeftX = 0;
+    viewport.TopLeftY = 0;
+    d3dContext->RSSetViewports(1, &viewport);
+
+    // Get swap chain surface
+    ComPtr<IDXGISurface> dxgiSurface;
+    if (FAILED(dxgiSwapChain->GetBuffer(0, __uuidof(IDXGISurface), static_cast<void**>(&dxgiSurface))))
+    {
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to get surface of swap chain\n");
+      return false;
+    }
+
+    // Create factory
+    if (FAILED(D2D1CreateFactory<ID2D1Factory>(D2D1_FACTORY_TYPE_SINGLE_THREADED, &d2dFactory)))
+    {
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to create 2D factory\n");
+      return false;
+    }
+
+    // Create render target
+    D2D1_RENDER_TARGET_PROPERTIES rtDesc = D2D1::RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_HARDWARE,
+      D2D1::PixelFormat(DXGI_FORMAT_UNKNOWN, D2D1_ALPHA_MODE_PREMULTIPLIED));
+    if (FAILED(d2dFactory->CreateDxgiSurfaceRenderTarget(dxgiSurface.Get(), &rtDesc, &d2dRenderTarget)))
+    {
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to create D2D render target\n");
+      return false;
+    }
+
+    /*
+    // Set up the Direct2D rendering framework that we will use to display frames
+    D2D1_FACTORY_OPTIONS options;
+    memset(&options, 0, sizeof(D2D1_FACTORY_OPTIONS));
+    if (FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof(ID2D1Factory3),
+      &options, (void**)&d2dFactory)))
+    {
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to create 2D factory\n");
+      return false;
+    }
+    if (FAILED(d3dDevice.As(&dxgiDevice)))
+    {
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to get DXGI device\n");
+      return false;
+    }
+    if (FAILED(d2dFactory->CreateDevice(dxgiDevice.Get(), &d2dDevice)))
+    {
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to get 2D device\n");
+      return false;
+    }
+    if (FAILED(d2dDevice->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &d2dContext)))
+    {
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to get 2D context\n");
+      return false;
+    }
+
+    // Get the backbuffer for this window which is be the final 3D render target
+    ID3D11Texture2D* backBuffer = nullptr;
+    if (FAILED(dxgiSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBuffer)))
+    {
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to get back buffer\n");
+      return false;
+    }
+
+    // Now we set up the Direct2D render target bitmap linked to the swapchain. 
+    // Whenever we render to this bitmap, it is directly rendered to the 
+    // swap chain associated with the window.
+    // Query the desktop's dpi settings, which will be used to create D2D's render targets.
+    float dpiX = 96, dpiY = 96;
+    //d2dFactory->GetDesktopDpi(&dpiX, &dpiY);
+    D2D1_BITMAP_PROPERTIES1 bitmapProperties = D2D1::BitmapProperties1(
+      D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+      D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE),
+      dpiX, dpiY);
+
+    // Direct2D needs the dxgi version of the backbuffer surface pointer.
+    if (FAILED(dxgiSwapChain->GetBuffer(0, IID_PPV_ARGS(&dxgiSurface))))
+    {
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to get DXGI back buffer\n");
+      return false;
+    }
+
+    // Get a D2D surface from the DXGI back buffer to use as the D2D render target.
+    if (FAILED(d2dContext->CreateBitmapFromDxgiSurface(dxgiSurface.Get(), &bitmapProperties,
+      &d2dTargetBitmap)))
+    {
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to create bitmap from surface\n");
+      return false;
+    }
+
+    // Now we can set the Direct2D render target.
+    d2dContext->SetTarget(d2dTargetBitmap.Get());
+    */
     return true;
   }
+
+    /*
+    // Detect the output monitor's current refresh rate and switch to our desired
+    // settings if we aren't there already
+    IDXGIOutput* output;
+    if (FAILED(dxgiSwapChain->GetContainingOutput(&output)))
+    {
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to get monitor\n");
+      return false;
+    }
+    DXGI_MODE_DESC emptyMode = {};
+    DXGI_MODE_DESC currentMode;
+    if (FAILED(output->FindClosestMatchingMode(&emptyMode, &currentMode, d3dDevice)))
+    {
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to get current frame rate\n");
+      return false;
+    }
+    if (((currentMode.RefreshRate.Numerator % currentMode.RefreshRate.Denominator) != 0) ||
+      ((currentMode.RefreshRate.Numerator / currentMode.RefreshRate.Denominator) != refreshRate))
+    {
+      fprintf(stderr, "## Need to update frame rate: %i/%i\n", currentMode.RefreshRate.Numerator,
+        currentMode.RefreshRate.Denominator);
+      memset(&swapChainDesc, 0, sizeof(DXGI_SWAP_CHAIN_DESC));
+      if (FAILED(dxgiSwapChain->GetDesc(&swapChainDesc)))
+      {
+        fprintf(stderr, "[Platform_Win] ERROR: Failed to get swap chain description\n");
+        return false;
+      }
+      DXGI_MODE_DESC targetModeDesc;
+      memset(&targetModeDesc, 0, sizeof(DXGI_MODE_DESC));
+      targetModeDesc.Width = swapChainDesc.BufferDesc.Width;
+      targetModeDesc.Height = swapChainDesc.BufferDesc.Height;
+      targetModeDesc.RefreshRate.Numerator = refreshRate;
+      targetModeDesc.RefreshRate.Denominator = 1;
+      targetModeDesc.Format = DXGI_FORMAT_UNKNOWN;
+      targetModeDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
+      targetModeDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
+      if (FAILED(dxgiSwapChain->ResizeTarget(&(targetModeDesc))))
+      {
+        fprintf(stderr, "[Platform_Win] ERROR: Failed to change refresh rate\n");
+        return false;
+      }
+      if (FAILED(dxgiSwapChain->ResizeBuffers(0, targetModeDesc.Width, targetModeDesc.Height,
+        TARGET_FORMAT, DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH)))
+      {
+        fprintf(stderr, "[Platform_Win] ERROR: Failed to resize the swap chain\n");
+      }
+      fprintf(stderr, "## Switch to mode: %i/%i\n", targetModeDesc.RefreshRate.Numerator,
+        targetModeDesc.RefreshRate.Denominator);
+    }
+    output->Release();
+    */
 
   uint32_t temp = 0;
   bool displayFrame(shared_ptr<FrameWrapper> frame)
   {
+    // Create a bitmap from the raw frame pixels
+    d2dRenderTarget->BeginDraw();
+    if (temp < 10)
+    {
+      fprintf(stderr, "## Drawing red\n");
+      D2D1_COLOR_F bgColour = { 1.0f, 0.0f, 0.0f, 1.0f };
+      d2dRenderTarget->Clear(bgColour);
+    }
+    else if (temp <= 20)
+    {
+      fprintf(stderr, "## Drawing blue\n");
+      D2D1_COLOR_F bgColour = { 0.0f, 0.0f, 1.0f, 1.0f };
+      d2dRenderTarget->Clear(bgColour);
+    }
+    if (temp == 20)
+    {
+      temp = 0;
+    }
+    else
+    {
+      temp++;
+    }
+
+    /*
+    D2D1_BITMAP_PROPERTIES bitmapProperties;
+    memset(&bitmapProperties, 0, sizeof(D2D1_BITMAP_PROPERTIES));
+    bitmapProperties.pixelFormat.format = DXGI_FORMAT_B8G8R8A8_UNORM;
+    bitmapProperties.pixelFormat.alphaMode = D2D1_ALPHA_MODE_IGNORE;
+    ComPtr<ID2D1Bitmap> bitmap;
+    if (FAILED(d2dRenderTarget->CreateBitmap(
+      D2D1::SizeU(frame->nativeWidth, frame->nativeHeight),
+      frame->nativeFrame, frame->nativeWidth * 4, &bitmapProperties, &bitmap)))
+    {
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to create bitmap\n");
+      return false;
+    }
+
+    // Draw the bitmap to the context
+    D2D1_RECT_F destRectangle = D2D1::RectF(0, 0, 300, 300);
+    D2D1_RECT_F srcRectangle = D2D1::RectF(0, 0, 300, 300);
+    d2dRenderTarget->DrawBitmap(bitmap.Get(), &destRectangle, 1.0,
+      D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, &srcRectangle);
+      */
+    if (FAILED(d2dRenderTarget->EndDraw()))
+    {
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to draw to context\n");
+      return false;
+    }
+    //bitmap = nullptr;
+    
+    // TODO: Wait for vsync and check the clock
+
+    // Present the frame
+    HRESULT hr = dxgiSwapChain->Present(1, 0);
+    if (FAILED(hr))
+    {
+      _com_error err(hr);
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to present frame: 0x%x, %s\n", hr, err.ErrorMessage());
+      return false;
+    }
+    return true;
+  }
+
+    /*
+  uint32_t temp = 0;
     // Get a reference to the monitor
     IDXGIOutput* output;
-    if (FAILED(swapChain->GetContainingOutput(&output)))
+    if (FAILED(dxgiSwapChain->GetContainingOutput(&output)))
     {
       fprintf(stderr, "[Platform_Win] ERROR: Failed to get monitor\n");
       return false;
     }
 
-    /*
     // Check the frame rate if we haven't already
     if (framesPerSecond == 0)
     {
       DXGI_MODE_DESC emptyMode = {};
       DXGI_MODE_DESC currentMode;
-      if (FAILED(output->FindClosestMatchingMode(&emptyMode, &currentMode, device)))
+      if (FAILED(output->FindClosestMatchingMode(&emptyMode, &currentMode, d3dDevice)))
       {
         fprintf(stderr, "[Platform_Win] ERROR: Failed to get current frame rate\n");
         return false;
@@ -166,7 +373,7 @@ public:
 
       DXGI_SWAP_CHAIN_DESC swapChainDesc;
       memset(&swapChainDesc, 0, sizeof(DXGI_SWAP_CHAIN_DESC));
-      if (FAILED(swapChain->GetDesc(&swapChainDesc)))
+      if (FAILED(dxgiSwapChain->GetDesc(&swapChainDesc)))
       {
         fprintf(stderr, "[Platform_Win] ERROR: Failed to get swap chain description\n");
         return false;
@@ -180,19 +387,19 @@ public:
       targetModeDesc.Format = swapChainDesc.BufferDesc.Format;
       targetModeDesc.Scaling = swapChainDesc.BufferDesc.Scaling;
       DXGI_MODE_DESC emptyMode = {};
-      if (FAILED(output->FindClosestMatchingMode(&emptyMode, &targetModeDesc, device)))
+      if (FAILED(output->FindClosestMatchingMode(&emptyMode, &targetModeDesc, d3dDevice)))
       {
         fprintf(stderr, "[Platform_Win] ERROR: Failed to find matching mode\n");
         return false;
       }
       fprintf(stderr, "## Matching mode: %i/%i\n", targetModeDesc.RefreshRate.Numerator,
         targetModeDesc.RefreshRate.Denominator);
-      if (FAILED(swapChain->ResizeTarget(&(targetModeDesc))))
+      if (FAILED(dxgiSwapChain->ResizeTarget(&(targetModeDesc))))
       {
         fprintf(stderr, "[Platform_Win] ERROR: Failed to change refresh rate\n");
         return false;
       }
-      if (FAILED(swapChain->ResizeBuffers(0, targetModeDesc.Width, targetModeDesc.Height,
+      if (FAILED(dxgiSwapChain->ResizeBuffers(0, targetModeDesc.Width, targetModeDesc.Height,
         TARGET_FORMAT, DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH)))
       {
         fprintf(stderr, "[Platform_Win] ERROR: Failed to resize the swap chain\n");
@@ -200,21 +407,21 @@ public:
       framesPerSecond = frame->fps;
       fprintf(stderr, "## Refresh rate changed\n");
     }
-    */
 
     // Draw the frame
     if ((temp++ % 30) < 15)
     {
       float color[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-      context->ClearRenderTargetView(renderTarget, color);
+      d3dContext->ClearRenderTargetView(d3dRenderTargetView, color);
     }
     else
     {
       float color[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-      context->ClearRenderTargetView(renderTarget, color);
+      d3dContext->ClearRenderTargetView(d3dRenderTargetView, color);
     }
 
     // Wait for vertical blank
+    // Note: This may not be necessary since we're passing 1 to Present()
     HRESULT hr = output->WaitForVBlank();
     output->Release();
     if (FAILED(hr))
@@ -222,42 +429,34 @@ public:
       fprintf(stderr, "[Platform_Win] ERROR: Failed to wait for vsync\n");
       return false;
     }
-
-    // Present the frame
-    swapChain->Present(1, 0);
-    return true;
-  }
+    */
 
   void destroyWindow()
   {
-    if (swapChain != nullptr)
+    if (dxgiSwapChain != nullptr)
     {
       BOOL fullscreen = false;
-      swapChain->GetFullscreenState(&fullscreen, nullptr);
+      dxgiSwapChain->GetFullscreenState(&fullscreen, nullptr);
       if (fullscreen)
       {
-        swapChain->SetFullscreenState(false, nullptr);
+        dxgiSwapChain->SetFullscreenState(false, nullptr);
       }
-      swapChain->Release();
-      swapChain = nullptr;
+      dxgiSwapChain = nullptr;
     }
-    if (renderTarget != nullptr)
+    d3dDevice = nullptr;
+    if (d3dContext != nullptr)
     {
-      renderTarget->Release();
-      renderTarget = 0;
+      d3dContext->ClearState();
+      d3dContext->Flush();
+      d3dContext = nullptr;
     }
-    if (context != nullptr)
-    {
-      context->ClearState();
-      context->Flush();
-      context->Release();
-      context = nullptr;
-    }
-    if (device != nullptr)
-    {
-      device->Release();
-      device = nullptr;
-    }
+    d3dRenderTargetView;
+    d2dFactory = nullptr;
+    d2dDevice = nullptr;
+    d2dContext = nullptr;
+    dxgiDevice = nullptr;
+    d2dRenderTarget = nullptr;
+    d2dTargetBitmap = nullptr;
     DestroyWindow();
   }
 
@@ -273,14 +472,54 @@ public:
     return true;
   }
 
+  // TODO:  Your window will receive a WM_SIZE message whenever such a transition happens, and calling
+  // IDXGISwapChain::ResizeBuffers is the swap chain's chance to re-allocate the buffers' storage for
+  // optimal presentation. This is why the application is required to release any references it has on
+  // the existing buffers before it calls IDXGISwapChain::ResizeBuffers.
   afx_msg void OnSize(UINT nType, int cx, int cy)
   {
-    // Resize the swap chain
-    if (swapChain && FAILED(swapChain->ResizeBuffers(0, cx, cy,
-      TARGET_FORMAT, DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH)))
+    fprintf(stderr, "## OnSize(%i, %i)\n", cx, cy);
+    
+    /*
+    if (dxgiSwapChain != nullptr)
     {
-      fprintf(stderr, "[Platform_Win] ERROR: Failed to resize the swap chain\n");
+      // Release all outstanding references to the swap chain's buffers
+      d3dContext->OMSetRenderTargets(0, 0, 0);
+      d3dRenderTargetView->Release();
+
+      // Resize the swap chain
+      if (FAILED(dxgiSwapChain->ResizeBuffers(0, 0, 0, DXGI_FORMAT_UNKNOWN, 0)))
+      {
+        fprintf(stderr, "[Platform_Win] ERROR: Failed to resize the swap chain\n");
+      }
+
+      // Get buffer and create a render-target-view
+      ID3D11Texture2D* backBuffer = nullptr;
+      if (FAILED(dxgiSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBuffer)))
+      {
+        fprintf(stderr, "[Platform_Win] ERROR: Failed to get back buffer\n");
+        return false;
+      }
+      HRESULT res = d3dDevice->CreateRenderTargetView(backBuffer, nullptr, &d3dRenderTargetView);
+      backBuffer->Release();
+      if (FAILED(res))
+      {
+        fprintf(stderr, "[Platform_Win] ERROR: Failed to create view\n");
+        return false;
+      }
+      d3dContext->OMSetRenderTargets(1, &d3dRenderTargetView, nullptr);
+
+      // Set up the viewport
+      D3D11_VIEWPORT viewport;
+      viewport.Width = cx;
+      viewport.Height = cy;
+      viewport.MinDepth = 0.0f;
+      viewport.MaxDepth = 1.0f;
+      viewport.TopLeftX = 0;
+      viewport.TopLeftY = 0;
+      d3dContext->RSSetViewports(1, &viewport);
     }
+    */
   }
 
   // We handle this private AFX message because CFrameWnd's implementation uses the
