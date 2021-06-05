@@ -21,7 +21,7 @@ ProjectorThread::ProjectorThread(int32_t xi, int32_t yi, bool scale,
 
 uint32_t ProjectorThread::run()
 {
-  if (!platform::createProjectorWindow(x, y, refreshRate))
+  if (!platform::createProjectorWindow(x, y, scaleToFit, refreshRate))
   {
     wrapper::invokeJsCallback(logCallback, "ERROR: Failed to create projector window.\n");
     return 1;

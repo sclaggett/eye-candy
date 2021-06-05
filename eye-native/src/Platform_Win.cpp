@@ -17,7 +17,11 @@ using namespace Microsoft::WRL;
 class ProjectorWindow : public CFrameWnd
 {
 private:
+  bool scaleToFit;
+  uint32_t refreshRate;
   HMONITOR hMonitor;
+  uint32_t width;
+  uint32_t height;
   ComPtr<ID3D11Device> d3dDevice;
   ComPtr<ID3D11DeviceContext> d3dContext;
   ComPtr<IDXGISwapChain> dxgiSwapChain;
@@ -33,8 +37,12 @@ public:
   ProjectorWindow() {};
   virtual ~ProjectorWindow() {};
 
-  bool createWindow(uint32_t x, uint32_t y, uint32_t refreshRate)
+  bool createWindow(uint32_t x, uint32_t y, bool scale, uint32_t refresh)
   {
+    // Remember the scaling mode and refresh rate
+    scaleToFit = scale;
+    refreshRate = refresh;
+
     // Get the monitor from the point
     POINT pt;
     pt.x = x;
@@ -55,10 +63,11 @@ public:
       fprintf(stderr, "[Platform_Win] ERROR: Failed to get monitor info\n");
       return false;
     }
-    CRect projectorRect(info.rcMonitor);
+    width = info.rcMonitor.right - info.rcMonitor.left;
+    height = info.rcMonitor.bottom - info.rcMonitor.top;
 
     // Create an instance of this class on the projector monitor and show it
-    if (!Create(nullptr, _T("EyeCandy"), WS_OVERLAPPEDWINDOW, projectorRect))
+    if (!Create(nullptr, _T("EyeCandy"), WS_OVERLAPPEDWINDOW, CRect(info.rcMonitor)))
     {
       fprintf(stderr, "[Platform_Win] ERROR: Failed to create window\n");
       return false;
@@ -73,8 +82,8 @@ public:
     DXGI_SWAP_CHAIN_DESC swapChainDesc;
     memset(&swapChainDesc, 0, sizeof(DXGI_SWAP_CHAIN_DESC));
     swapChainDesc.BufferCount = 2;
-    swapChainDesc.BufferDesc.Width = projectorRect.Width();
-    swapChainDesc.BufferDesc.Height = projectorRect.Height();
+    swapChainDesc.BufferDesc.Width = width;
+    swapChainDesc.BufferDesc.Height = height;
     swapChainDesc.BufferDesc.RefreshRate.Numerator = 0;
     swapChainDesc.BufferDesc.RefreshRate.Denominator = 0;
     swapChainDesc.BufferDesc.Format = TARGET_FORMAT;
@@ -126,8 +135,8 @@ public:
 
     // Bind viewport
     D3D11_VIEWPORT viewport;
-    viewport.Width = projectorRect.Width();
-    viewport.Height = projectorRect.Height();
+    viewport.Width = width;
+    viewport.Height = height;
     viewport.MinDepth = 0.0f;
     viewport.MaxDepth = 1.0f;
     viewport.TopLeftX = 0;
@@ -281,28 +290,6 @@ public:
   {
     // Create a bitmap from the raw frame pixels
     d2dRenderTarget->BeginDraw();
-    if (temp < 10)
-    {
-      fprintf(stderr, "## Drawing red\n");
-      D2D1_COLOR_F bgColour = { 1.0f, 0.0f, 0.0f, 1.0f };
-      d2dRenderTarget->Clear(bgColour);
-    }
-    else if (temp <= 20)
-    {
-      fprintf(stderr, "## Drawing blue\n");
-      D2D1_COLOR_F bgColour = { 0.0f, 0.0f, 1.0f, 1.0f };
-      d2dRenderTarget->Clear(bgColour);
-    }
-    if (temp == 20)
-    {
-      temp = 0;
-    }
-    else
-    {
-      temp++;
-    }
-
-    /*
     D2D1_BITMAP_PROPERTIES bitmapProperties;
     memset(&bitmapProperties, 0, sizeof(D2D1_BITMAP_PROPERTIES));
     bitmapProperties.pixelFormat.format = DXGI_FORMAT_B8G8R8A8_UNORM;
@@ -317,22 +304,31 @@ public:
     }
 
     // Draw the bitmap to the context
-    D2D1_RECT_F destRectangle = D2D1::RectF(0, 0, 300, 300);
-    D2D1_RECT_F srcRectangle = D2D1::RectF(0, 0, 300, 300);
+    D2D1_RECT_F destRectangle;
+    if (scaleToFit)
+    {
+      destRectangle = D2D1::RectF(0, 0, width, height);
+    }
+    else
+    {
+      destRectangle.left = (width - frame->nativeWidth) / 2;
+      destRectangle.right = destRectangle.left + frame->nativeWidth;
+      destRectangle.top = (height - frame->nativeHeight) / 2;
+      destRectangle.bottom = destRectangle.top + frame->nativeHeight;
+    }
+    D2D1_RECT_F srcRectangle = D2D1::RectF(0, 0, frame->nativeWidth, frame->nativeHeight);
     d2dRenderTarget->DrawBitmap(bitmap.Get(), &destRectangle, 1.0,
       D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, &srcRectangle);
-      */
     if (FAILED(d2dRenderTarget->EndDraw()))
     {
       fprintf(stderr, "[Platform_Win] ERROR: Failed to draw to context\n");
       return false;
     }
-    //bitmap = nullptr;
     
     // TODO: Wait for vsync and check the clock
 
     // Present the frame
-    HRESULT hr = dxgiSwapChain->Present(1, 0);
+    HRESULT hr = dxgiSwapChain->Present(2, 0);
     if (FAILED(hr))
     {
       _com_error err(hr);
@@ -479,8 +475,9 @@ public:
   afx_msg void OnSize(UINT nType, int cx, int cy)
   {
     fprintf(stderr, "## OnSize(%i, %i)\n", cx, cy);
-    
-    /*
+    width = cx;
+    height = cy;
+
     if (dxgiSwapChain != nullptr)
     {
       // Release all outstanding references to the swap chain's buffers
@@ -498,14 +495,14 @@ public:
       if (FAILED(dxgiSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBuffer)))
       {
         fprintf(stderr, "[Platform_Win] ERROR: Failed to get back buffer\n");
-        return false;
+        return;
       }
       HRESULT res = d3dDevice->CreateRenderTargetView(backBuffer, nullptr, &d3dRenderTargetView);
       backBuffer->Release();
       if (FAILED(res))
       {
         fprintf(stderr, "[Platform_Win] ERROR: Failed to create view\n");
-        return false;
+        return;
       }
       d3dContext->OMSetRenderTargets(1, &d3dRenderTargetView, nullptr);
 
@@ -519,7 +516,6 @@ public:
       viewport.TopLeftY = 0;
       d3dContext->RSSetViewports(1, &viewport);
     }
-    */
   }
 
   // We handle this private AFX message because CFrameWnd's implementation uses the
@@ -913,7 +909,8 @@ vector<uint32_t> platform::getDisplayFrequencies(int32_t x, int32_t y)
 }
 
 ProjectorWindow* gProjectorWindow = nullptr;
-bool platform::createProjectorWindow(uint32_t x, uint32_t y, uint32_t refreshRate)
+bool platform::createProjectorWindow(uint32_t x, uint32_t y, bool scaleToFit,
+  uint32_t refreshRate)
 {
   if (gProjectorWindow != nullptr)
   {
@@ -921,7 +918,7 @@ bool platform::createProjectorWindow(uint32_t x, uint32_t y, uint32_t refreshRat
     return false;
   }
   gProjectorWindow = new ProjectorWindow();
-  return gProjectorWindow->createWindow(x, y, refreshRate);
+  return gProjectorWindow->createWindow(x, y, scaleToFit, refreshRate);
 }
 
 bool platform::displayProjectorFrame(shared_ptr<FrameWrapper> wrapper)

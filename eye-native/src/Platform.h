@@ -35,7 +35,8 @@ namespace platform
 
   std::vector<uint32_t> getDisplayFrequencies(int32_t x, int32_t y);
 
-  bool createProjectorWindow(uint32_t x, uint32_t y, uint32_t refreshRate);
+  bool createProjectorWindow(uint32_t x, uint32_t y, bool scaleToFit,
+    uint32_t refreshRate);
   bool displayProjectorFrame(std::shared_ptr<FrameWrapper> wrapper);
   void destroyProjectorWindow();
 }
