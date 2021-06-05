@@ -25,13 +25,9 @@ private:
   ComPtr<ID3D11Device> d3dDevice;
   ComPtr<ID3D11DeviceContext> d3dContext;
   ComPtr<IDXGISwapChain> dxgiSwapChain;
-  ComPtr<ID3D11RenderTargetView> d3dRenderTargetView;
   ComPtr<ID2D1Factory> d2dFactory;
-  ComPtr<ID2D1Device2> d2dDevice;
-  ComPtr<ID2D1DeviceContext> d2dContext;
-  ComPtr<IDXGIDevice> dxgiDevice;
+  ComPtr<ID3D11RenderTargetView> d3dRenderTargetView;
   ComPtr<ID2D1RenderTarget> d2dRenderTarget;
-  ComPtr<ID2D1Bitmap1> d2dTargetBitmap;
 
 public:
   ProjectorWindow() {};
@@ -104,7 +100,18 @@ public:
       return false;
     }
 
-    /*
+    // Create the Direct2D factory and the DirectX resources
+    if (FAILED(D2D1CreateFactory<ID2D1Factory>(D2D1_FACTORY_TYPE_SINGLE_THREADED, &d2dFactory)))
+    {
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to create 2D factory\n");
+      return false;
+    }
+    if (!CreateResources())
+    {
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to create resources\n");
+      return false;
+    }
+
     // Detect if newly created full-screen swap chain isn't actually full screen and make it so
     BOOL fullscreen;
     if (FAILED(dxgiSwapChain->GetFullscreenState(&fullscreen, nullptr)))
@@ -116,8 +123,11 @@ public:
     {
       dxgiSwapChain->SetFullscreenState(true, nullptr);
     }
-    */
+    return true;
+  }
 
+  bool CreateResources()
+  {
     // Get buffer and create a render-target-view
     ComPtr<ID3D11Resource> backBuffer;
     if (FAILED(dxgiSwapChain->GetBuffer(0, __uuidof(ID3D11Resource), (LPVOID*)&backBuffer)))
@@ -151,13 +161,6 @@ public:
       return false;
     }
 
-    // Create factory
-    if (FAILED(D2D1CreateFactory<ID2D1Factory>(D2D1_FACTORY_TYPE_SINGLE_THREADED, &d2dFactory)))
-    {
-      fprintf(stderr, "[Platform_Win] ERROR: Failed to create 2D factory\n");
-      return false;
-    }
-
     // Create render target
     D2D1_RENDER_TARGET_PROPERTIES rtDesc = D2D1::RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_HARDWARE,
       D2D1::PixelFormat(DXGI_FORMAT_UNKNOWN, D2D1_ALPHA_MODE_PREMULTIPLIED));
@@ -166,71 +169,14 @@ public:
       fprintf(stderr, "[Platform_Win] ERROR: Failed to create D2D render target\n");
       return false;
     }
+  }
 
-    /*
-    // Set up the Direct2D rendering framework that we will use to display frames
-    D2D1_FACTORY_OPTIONS options;
-    memset(&options, 0, sizeof(D2D1_FACTORY_OPTIONS));
-    if (FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, __uuidof(ID2D1Factory3),
-      &options, (void**)&d2dFactory)))
-    {
-      fprintf(stderr, "[Platform_Win] ERROR: Failed to create 2D factory\n");
-      return false;
-    }
-    if (FAILED(d3dDevice.As(&dxgiDevice)))
-    {
-      fprintf(stderr, "[Platform_Win] ERROR: Failed to get DXGI device\n");
-      return false;
-    }
-    if (FAILED(d2dFactory->CreateDevice(dxgiDevice.Get(), &d2dDevice)))
-    {
-      fprintf(stderr, "[Platform_Win] ERROR: Failed to get 2D device\n");
-      return false;
-    }
-    if (FAILED(d2dDevice->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, &d2dContext)))
-    {
-      fprintf(stderr, "[Platform_Win] ERROR: Failed to get 2D context\n");
-      return false;
-    }
-
-    // Get the backbuffer for this window which is be the final 3D render target
-    ID3D11Texture2D* backBuffer = nullptr;
-    if (FAILED(dxgiSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBuffer)))
-    {
-      fprintf(stderr, "[Platform_Win] ERROR: Failed to get back buffer\n");
-      return false;
-    }
-
-    // Now we set up the Direct2D render target bitmap linked to the swapchain. 
-    // Whenever we render to this bitmap, it is directly rendered to the 
-    // swap chain associated with the window.
-    // Query the desktop's dpi settings, which will be used to create D2D's render targets.
-    float dpiX = 96, dpiY = 96;
-    //d2dFactory->GetDesktopDpi(&dpiX, &dpiY);
-    D2D1_BITMAP_PROPERTIES1 bitmapProperties = D2D1::BitmapProperties1(
-      D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
-      D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE),
-      dpiX, dpiY);
-
-    // Direct2D needs the dxgi version of the backbuffer surface pointer.
-    if (FAILED(dxgiSwapChain->GetBuffer(0, IID_PPV_ARGS(&dxgiSurface))))
-    {
-      fprintf(stderr, "[Platform_Win] ERROR: Failed to get DXGI back buffer\n");
-      return false;
-    }
-
-    // Get a D2D surface from the DXGI back buffer to use as the D2D render target.
-    if (FAILED(d2dContext->CreateBitmapFromDxgiSurface(dxgiSurface.Get(), &bitmapProperties,
-      &d2dTargetBitmap)))
-    {
-      fprintf(stderr, "[Platform_Win] ERROR: Failed to create bitmap from surface\n");
-      return false;
-    }
-
-    // Now we can set the Direct2D render target.
-    d2dContext->SetTarget(d2dTargetBitmap.Get());
-    */
-    return true;
+  void DeleteResources()
+  {
+    // Release all outstanding references to the swap chain's buffers
+    d3dContext->OMSetRenderTargets(0, 0, 0);
+    d3dRenderTargetView = nullptr;
+    d2dRenderTarget = nullptr;
   }
 
     /*
@@ -285,7 +231,6 @@ public:
     output->Release();
     */
 
-  uint32_t temp = 0;
   bool displayFrame(shared_ptr<FrameWrapper> frame)
   {
     // Create a bitmap from the raw frame pixels
@@ -339,7 +284,6 @@ public:
   }
 
     /*
-  uint32_t temp = 0;
     // Get a reference to the monitor
     IDXGIOutput* output;
     if (FAILED(dxgiSwapChain->GetContainingOutput(&output)))
@@ -404,18 +348,6 @@ public:
       fprintf(stderr, "## Refresh rate changed\n");
     }
 
-    // Draw the frame
-    if ((temp++ % 30) < 15)
-    {
-      float color[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-      d3dContext->ClearRenderTargetView(d3dRenderTargetView, color);
-    }
-    else
-    {
-      float color[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-      d3dContext->ClearRenderTargetView(d3dRenderTargetView, color);
-    }
-
     // Wait for vertical blank
     // Note: This may not be necessary since we're passing 1 to Present()
     HRESULT hr = output->WaitForVBlank();
@@ -446,13 +378,9 @@ public:
       d3dContext->Flush();
       d3dContext = nullptr;
     }
-    d3dRenderTargetView;
+    d3dRenderTargetView = nullptr;
     d2dFactory = nullptr;
-    d2dDevice = nullptr;
-    d2dContext = nullptr;
-    dxgiDevice = nullptr;
     d2dRenderTarget = nullptr;
-    d2dTargetBitmap = nullptr;
     DestroyWindow();
   }
 
@@ -468,53 +396,25 @@ public:
     return true;
   }
 
-  // TODO:  Your window will receive a WM_SIZE message whenever such a transition happens, and calling
-  // IDXGISwapChain::ResizeBuffers is the swap chain's chance to re-allocate the buffers' storage for
-  // optimal presentation. This is why the application is required to release any references it has on
-  // the existing buffers before it calls IDXGISwapChain::ResizeBuffers.
   afx_msg void OnSize(UINT nType, int cx, int cy)
   {
-    fprintf(stderr, "## OnSize(%i, %i)\n", cx, cy);
     width = cx;
     height = cy;
 
     if (dxgiSwapChain != nullptr)
     {
-      // Release all outstanding references to the swap chain's buffers
-      d3dContext->OMSetRenderTargets(0, 0, 0);
-      d3dRenderTargetView->Release();
-
-      // Resize the swap chain
+      // Release all outstanding DirectX resources, resize the swap chain, and recreate the DirectX resources
+      DeleteResources();
       if (FAILED(dxgiSwapChain->ResizeBuffers(0, 0, 0, DXGI_FORMAT_UNKNOWN, 0)))
       {
         fprintf(stderr, "[Platform_Win] ERROR: Failed to resize the swap chain\n");
-      }
-
-      // Get buffer and create a render-target-view
-      ID3D11Texture2D* backBuffer = nullptr;
-      if (FAILED(dxgiSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBuffer)))
-      {
-        fprintf(stderr, "[Platform_Win] ERROR: Failed to get back buffer\n");
         return;
       }
-      HRESULT res = d3dDevice->CreateRenderTargetView(backBuffer, nullptr, &d3dRenderTargetView);
-      backBuffer->Release();
-      if (FAILED(res))
+      if (!CreateResources())
       {
-        fprintf(stderr, "[Platform_Win] ERROR: Failed to create view\n");
+        fprintf(stderr, "[Platform_Win] ERROR: Failed to create resources\n");
         return;
       }
-      d3dContext->OMSetRenderTargets(1, &d3dRenderTargetView, nullptr);
-
-      // Set up the viewport
-      D3D11_VIEWPORT viewport;
-      viewport.Width = cx;
-      viewport.Height = cy;
-      viewport.MinDepth = 0.0f;
-      viewport.MaxDepth = 1.0f;
-      viewport.TopLeftX = 0;
-      viewport.TopLeftY = 0;
-      d3dContext->RSSetViewports(1, &viewport);
     }
   }
 
