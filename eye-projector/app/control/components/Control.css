@@ -131,6 +131,10 @@
   padding-right: 5px;
 }
 
+.progressTextDelay {
+  color: red;
+}
+
 .log {
   display: flex;
 }
@@ -201,12 +205,6 @@
   width: 8em;
 }
 
-
-
-
-
-
-
 .dirSelect {
   background-image: url('../../resources/images/Folder.png');
   background-color: khaki;
@@ -223,7 +221,6 @@
   display: flex;
 }
 
-
 .programText {
   padding: 5px;
   background-color: #333;
@@ -238,4 +235,3 @@
   border: none;
   resize: none;
 }
-

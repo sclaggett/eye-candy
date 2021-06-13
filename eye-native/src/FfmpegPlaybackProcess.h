@@ -10,7 +10,8 @@
 class FfmpegPlaybackProcess : public Thread
 {
 public:
-  FfmpegPlaybackProcess(std::string executable, std::string videoPath);
+  FfmpegPlaybackProcess(std::string executable, std::string videoPath,
+    uint32_t width, uint32_t height);
   virtual ~FfmpegPlaybackProcess();
 
 public:
@@ -30,6 +31,8 @@ public:
 
 private:
   std::string executable;
+  uint32_t width;
+  uint32_t height;
   std::vector<std::string> arguments;
   bool processStarted = false;
   std::mutex processMutex;

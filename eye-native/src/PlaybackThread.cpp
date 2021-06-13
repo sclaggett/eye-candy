@@ -10,7 +10,8 @@ using namespace std;
 
 PlaybackThread::PlaybackThread(uint32_t x1, uint32_t y1, vector<string> vids,
     bool scale, string ffmpeg, string ffprobe, wrapper::JsCallback* log,
-    wrapper::JsCallback* duration, wrapper::JsCallback* position) :
+    wrapper::JsCallback* duration, wrapper::JsCallback* position,
+    wrapper::JsCallback* delay) :
   Thread("playback"),
   x(x1),
   y(y1),
@@ -20,7 +21,8 @@ PlaybackThread::PlaybackThread(uint32_t x1, uint32_t y1, vector<string> vids,
   ffprobePath(ffprobe),
   logCallback(log),
   durationCallback(duration),
-  positionCallback(position)
+  positionCallback(position),
+  delayCallback(delay)
 {
 }
 
@@ -148,7 +150,7 @@ uint32_t PlaybackThread::run()
   shared_ptr<Queue<shared_ptr<FrameWrapper>>> previewFrameQueue(
     new Queue<shared_ptr<FrameWrapper>>());
   ProjectorThread* projectorThread = new ProjectorThread(x, y, scaleToFit, monitorRefreshRate,
-    pendingFrameQueue, previewFrameQueue, logCallback, positionCallback);
+    pendingFrameQueue, previewFrameQueue, logCallback, positionCallback, delayCallback);
   projectorThread->spawn();
 
   // Spawn the preview send thread that will transmit the frames from the preview
@@ -174,7 +176,8 @@ uint32_t PlaybackThread::run()
       message << "Starting to decode video file " << to_string(i + 1) << "." << endl;
       wrapper::invokeJsCallback(logCallback, message.str());
     }
-    FfmpegPlaybackProcess* ffmpegProcess = new FfmpegPlaybackProcess(ffmpegPath, video);
+    FfmpegPlaybackProcess* ffmpegProcess = new FfmpegPlaybackProcess(ffmpegPath, video,
+      width, height);
     ffmpegProcess->spawn();
 
     // Read each frame of the video

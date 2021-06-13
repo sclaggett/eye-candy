@@ -53,11 +53,12 @@ type ControlState = {
   // Log messages
   log: string;
 
-  // Flag that indicates if we're running, the time elapsed and total duration in
-  // milliseconds, and the percent complete
+  // Flag that indicates if we're running, the time elapsed, total duration, and any
+  // delay in milliseconds, and the percent complete
   running: boolean;
   runElapsedMs: number;
   runTotalMs: number;
+  runDelayMs: number;
 
   // Preview image URL and position
   imageUrl: string;
@@ -110,6 +111,7 @@ export default class Control extends React.Component<
       running: false,
       runElapsedMs: 0,
       runTotalMs: 0,
+      runDelayMs: 0,
       imageUrl: '',
       imageTop: 0,
       imageLeft: 0,
@@ -142,6 +144,7 @@ export default class Control extends React.Component<
     this.onPreviewInterval = this.onPreviewInterval.bind(this);
     this.onPlaybackDuration = this.onPlaybackDuration.bind(this);
     this.onPlaybackPosition = this.onPlaybackPosition.bind(this);
+    this.onPlaybackDelay = this.onPlaybackDelay.bind(this);
     this.onRunStopped = this.onRunStopped.bind(this);
     this.onDirectorySelectClick = this.onDirectorySelectClick.bind(this);
     this.onFfmpegSelectClick = this.onFfmpegSelectClick.bind(this);
@@ -153,6 +156,7 @@ export default class Control extends React.Component<
     ipcRenderer.on('runPreviewChannel', this.onRunPreviewChannel);
     ipcRenderer.on('playbackDuration', this.onPlaybackDuration);
     ipcRenderer.on('playbackPosition', this.onPlaybackPosition);
+    ipcRenderer.on('playbackDelay', this.onPlaybackDelay);
     ipcRenderer.on('runStopped', this.onRunStopped);
   }
 
@@ -367,6 +371,7 @@ export default class Control extends React.Component<
       running: true,
       runElapsedMs: 0,
       runTotalMs: 0,
+      runDelayMs: 0,
       imageUrl: '',
     } as unknown) as ControlState);
   }
@@ -453,9 +458,9 @@ export default class Control extends React.Component<
   }
 
   /*
-   * The onPlaybackDuration() and onPlaybackPosition() functions will be invoked
-   * by the main process to notify the control window of the total duration
-   * and as playback progresses.
+   * The onPlaybackDuration(), onPlaybackPosition(), and onPlaybackDelay() functions
+   * will be invoked by the main process to notify the control window of the total
+   * duration and as playback progresses.
    */
   onPlaybackDuration(_event: IpcRendererEvent, duration: number) {
     this.setState({
@@ -466,6 +471,12 @@ export default class Control extends React.Component<
   onPlaybackPosition(_event: IpcRendererEvent, position: number) {
     this.setState((prevState) => ({
       runElapsedMs: position,
+    }));
+  }
+
+  onPlaybackDelay(_event: IpcRendererEvent, delay: number) {
+    this.setState((prevState) => ({
+      runDelayMs: delay,
     }));
   }
 
@@ -554,7 +565,7 @@ export default class Control extends React.Component<
    * that should be displayed and the framework will update the output as necessary.
    */
   render() {
-    // Check if we're not ready to start running.
+    // Determine if we're not ready to run yet so we can disable the option below
     const notReadyToRun: boolean =
       this.state.outputName.length === 0 ||
       this.state.rootDirectory.length === 0 ||
@@ -562,11 +573,13 @@ export default class Control extends React.Component<
       this.state.projectorLatency === 0 ||
       this.state.videos.length === 0 ||
       this.state.projDetected === false;
+
+    // Format the projector information
     let projInfo = '';
     if (this.state.projDetected) {
       let refreshRates = '';
       for (let i = 0; i < this.state.projRefreshRates.length; i += 1) {
-        if (refreshRates.length !== 0) {
+        if (refreshRates.length > 500) {
           refreshRates += ', ';
         }
         refreshRates += this.state.projRefreshRates[i];
@@ -575,6 +588,8 @@ export default class Control extends React.Component<
     } else {
       projInfo = 'Not detected';
     }
+
+    // Set the preview container style
     const previewContainerStyle = {
       top: `${this.state.imageTop}px`,
       left: `${this.state.imageLeft}px`,
@@ -582,11 +597,18 @@ export default class Control extends React.Component<
       height: `${this.state.imageHeight}px`,
     };
 
-    let progress = '';
+    // Format the progress string components
+    let progressElapsed = '';
+    let showProgressDelay = false;
+    let progressDelay = '';
+    let progressTotal = '';
     if (this.state.running) {
-      progress = `${this.formatDuration(
-        this.state.runElapsedMs
-      )}/${this.formatDuration(this.state.runTotalMs)}`;
+      progressElapsed = this.formatDuration(this.state.runElapsedMs);
+      if (this.state.runDelayMs > 10) {
+        showProgressDelay = true;
+        progressDelay = (this.state.runDelayMs / 1000).toFixed(2);
+      }
+      progressTotal = this.formatDuration(this.state.runTotalMs);
     }
 
     return (
@@ -687,7 +709,14 @@ export default class Control extends React.Component<
               className={styles.progress}
               style={this.state.running ? {} : { visibility: 'hidden' }}
             >
-              {`${progress}`}
+              <div>{progressElapsed}</div>
+              <div
+                className={styles.progressTextDelay}
+                style={showProgressDelay ? {} : { display: 'none' }}
+              >
+                {`+${progressDelay}`}
+              </div>
+              <div>{`/${progressTotal}`}</div>
             </div>
           </div>
         </div>

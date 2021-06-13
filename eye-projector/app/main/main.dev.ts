@@ -120,9 +120,9 @@ function runStopped(message) {
 }
 
 /**
- * The playbackDuration() and playbackProgress() functions pass the total duration of the
- * video files and the current position, both in seconds, to the control window for
- * display to the user.
+ * The playbackDuration(), playbackProgress(), and playbackDelay() functions pass the total
+ * duration of the video files, the current position, and any delay, all in milliseconds,
+ * to the control window for display to the user.
  */
 function playbackDuration(duration: number) {
   durationMs = duration;
@@ -136,6 +136,11 @@ function playbackPosition(position: number) {
   }
   if (position >= durationMs) {
     runStopped('Run complete');
+  }
+}
+function playbackDelay(delay: number) {
+  if (controlWindow && controlWindow.webContents) {
+    controlWindow.webContents.send('playbackDelay', delay);
   }
 }
 
@@ -407,7 +412,8 @@ ipcMain.on('startRun', (_event, stringArg: string) => {
     args.videos,
     args.scaleToFit,
     playbackDuration,
-    playbackPosition
+    playbackPosition,
+    playbackDelay
   );
   if (result !== '') {
     log(`Error: ${result}\n`);

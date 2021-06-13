@@ -37,6 +37,7 @@ namespace platform
 
   bool createProjectorWindow(uint32_t x, uint32_t y, bool scaleToFit,
     uint32_t refreshRate);
-  bool displayProjectorFrame(std::shared_ptr<FrameWrapper> wrapper);
+  bool displayProjectorFrame(std::shared_ptr<FrameWrapper> wrapper,
+    uint32_t& delayMs);
   void destroyProjectorWindow();
 }

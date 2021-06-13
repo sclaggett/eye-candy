@@ -25,15 +25,23 @@ uint32_t PipeReader::run()
   while (!checkForExit())
   {
     // Sleep if we've exceeded our max buffer size
-    if ((maxBuffer != 0) && (data.size() > maxBuffer))
+    if (maxBuffer != 0)
     {
-      platform::sleep(10);
-      continue;
+      uint32_t dataSize;
+      {
+        unique_lock<mutex> lock(dataMutex);
+        dataSize = data.size();
+      }
+      if (dataSize > maxBuffer)
+      {
+        platform::sleep(5);
+        continue;
+      }
     }
     
     // Wait for data to become available to read and continue around the loop if nothing
-    // arrives within 10 ms
-    int32_t ret = platform::waitForData(file, 10);
+    // arrives within 5 ms
+    int32_t ret = platform::waitForData(file, 5);
     if (ret == -1)
     {
       printf("[PipeReader] ERROR: Failed to wait for data\n");

@@ -169,13 +169,14 @@ void wrapper::closeVideoOutput(const Napi::CallbackInfo& info)
 Napi::String wrapper::beginVideoPlayback(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
-  if ((info.Length() != 6) ||
+  if ((info.Length() != 7) ||
     !info[0].IsNumber() ||
     !info[1].IsNumber() ||
     !info[2].IsArray() ||
     !info[3].IsBoolean() ||
     !info[4].IsFunction() ||
-    !info[5].IsFunction())
+    !info[5].IsFunction() ||
+    !info[6].IsFunction())
   {
     Napi::TypeError::New(env, "Incorrect parameter type").ThrowAsJavaScriptException();
     return Napi::String();
@@ -195,8 +196,10 @@ Napi::String wrapper::beginVideoPlayback(const Napi::CallbackInfo& info)
   wrapper::JsCallback* durationJsCallback = createJsCallback(env, durationCallback);
   Napi::Function positionCallback = info[5].As<Napi::Function>();
   wrapper::JsCallback* positionJsCallback = createJsCallback(env, positionCallback);
+  Napi::Function delayCallback = info[6].As<Napi::Function>();
+  wrapper::JsCallback* delayJsCallback = createJsCallback(env, delayCallback);
   return Napi::String::New(env, native::beginVideoPlayback(env, x, y, videos, scaleToFit,
-    durationJsCallback, positionJsCallback));
+    durationJsCallback, positionJsCallback, delayJsCallback));
 }
 
 Napi::String wrapper::endVideoPlayback(const Napi::CallbackInfo& info)

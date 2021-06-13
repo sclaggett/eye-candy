@@ -123,7 +123,7 @@ void native::closeVideoOutput(Napi::Env env)
 
 string native::beginVideoPlayback(Napi::Env env, int32_t x, int32_t y,
   vector<string> videos, bool scaleToFit, wrapper::JsCallback* durationCallback,
-  wrapper::JsCallback* positionCallback)
+  wrapper::JsCallback* positionCallback, wrapper::JsCallback* delayCallback)
 {
   // Make sure we've been initialized and aren't currently playing
   if (!gInitialized)
@@ -139,7 +139,7 @@ string native::beginVideoPlayback(Napi::Env env, int32_t x, int32_t y,
   // frames as they are decoded, and store then in the pending frames queue
   gPlaybackThread = shared_ptr<PlaybackThread>(new PlaybackThread(x, y,
     videos, scaleToFit, gFfmpegPath, gFfprobePath, gLogCallback,
-    durationCallback, positionCallback));
+    durationCallback, positionCallback, delayCallback));
   gPlaybackThread->spawn();
 
   gPlaying = true;

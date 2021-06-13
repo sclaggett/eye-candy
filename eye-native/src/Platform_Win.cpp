@@ -17,17 +17,32 @@ using namespace Microsoft::WRL;
 class ProjectorWindow : public CFrameWnd
 {
 private:
-  bool scaleToFit;
-  uint32_t refreshRate;
-  HMONITOR hMonitor;
-  uint32_t width;
-  uint32_t height;
+  // Scaling flag, target refresh rate, monitor handle, and video dimensions
+  bool scaleToFit = false;
+  uint32_t refreshRate = 0;
+  HMONITOR hMonitor = NULL;
+  uint32_t width = 0;
+  uint32_t height = 0;
+
+  // DirectX drawing objects
   ComPtr<ID3D11Device> d3dDevice;
   ComPtr<ID3D11DeviceContext> d3dContext;
   ComPtr<IDXGISwapChain> dxgiSwapChain;
   ComPtr<ID2D1Factory> d2dFactory;
   ComPtr<ID3D11RenderTargetView> d3dRenderTargetView;
   ComPtr<ID2D1RenderTarget> d2dRenderTarget;
+
+  // The playback position in milliseconds that we should be at if we haven't experienced
+  // any frame starvation, i.e. if there are no delays between calls to displayFrame()
+  double targetPlaybackPosition = 0;
+
+  // The time when the first frame was presented. This will be combined with the current time
+  // to detect if frame starvation has occurred by comparing to the target playback position
+  LARGE_INTEGER firstFrameTimestamp;
+
+  // Timing initialization and QFC frequency
+  bool timingInitialized = false;
+  LARGE_INTEGER qpcFrequency;
 
 public:
   ProjectorWindow() {};
@@ -169,6 +184,7 @@ public:
       fprintf(stderr, "[Platform_Win] ERROR: Failed to create D2D render target\n");
       return false;
     }
+    return true;
   }
 
   void DeleteResources()
@@ -231,10 +247,15 @@ public:
     output->Release();
     */
 
-  bool displayFrame(shared_ptr<FrameWrapper> frame)
+  bool displayFrame(shared_ptr<FrameWrapper> frame, uint32_t& delayMs)
   {
-    // Create a bitmap from the raw frame pixels
+    /* Step 1: Draw the frame to the back buffer */
+
+    // Start with a solid black background
     d2dRenderTarget->BeginDraw();
+    d2dRenderTarget->Clear(D2D1::ColorF(0, 0, 0, 1));
+
+    // Create a bitmap from the raw frame pixels
     D2D1_BITMAP_PROPERTIES bitmapProperties;
     memset(&bitmapProperties, 0, sizeof(D2D1_BITMAP_PROPERTIES));
     bitmapProperties.pixelFormat.format = DXGI_FORMAT_B8G8R8A8_UNORM;
@@ -269,17 +290,85 @@ public:
       fprintf(stderr, "[Platform_Win] ERROR: Failed to draw to context\n");
       return false;
     }
-    
-    // TODO: Wait for vsync and check the clock
 
-    // Present the frame
-    HRESULT hr = dxgiSwapChain->Present(2, 0);
+    /* Step 2: Wait for vsync and present the frame */
+    
+    // Wait until the next vsync signal and present the frame
+    IDXGIOutput* output;
+    if (FAILED(dxgiSwapChain->GetContainingOutput(&output)))
+    {
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to get containing output\n");
+      return false;
+    }
+    if (FAILED(output->WaitForVBlank()))
+    {
+      fprintf(stderr, "[Platform_Win] ERROR: Failed to wait for vsync\n");
+      return false;
+    }
+
+    // Present the frame immediately now that vsync has occurred
+    HRESULT hr = dxgiSwapChain->Present(0, 0);
     if (FAILED(hr))
     {
       _com_error err(hr);
       fprintf(stderr, "[Platform_Win] ERROR: Failed to present frame: 0x%x, %s\n", hr, err.ErrorMessage());
       return false;
     }
+
+    /* Step 3: Record the time of frame presentation */
+
+    // Initialize timing
+    if (!timingInitialized)
+    {
+      QueryPerformanceFrequency(&qpcFrequency);
+      QueryPerformanceCounter(&firstFrameTimestamp);
+      timingInitialized = true;
+    }
+
+    // Measure the actual playback position and use it to calculate any delay caused by
+    // frame starvation
+    LARGE_INTEGER currentTime, actualPosition;
+    QueryPerformanceCounter(&currentTime);
+    actualPosition.QuadPart = currentTime.QuadPart - firstFrameTimestamp.QuadPart;
+    actualPosition.QuadPart *= 1000000;
+    actualPosition.QuadPart /= qpcFrequency.QuadPart;
+    double actualPlaybackPosition = (double)actualPosition.QuadPart / 1000;
+    if (actualPlaybackPosition > targetPlaybackPosition)
+    {
+      delayMs = (uint32_t)(actualPlaybackPosition - targetPlaybackPosition);
+    }
+    else
+    {
+      delayMs = 0;
+    }
+
+    // Update the target playback position, a value that won't actually be valid until the next
+    // vertical sync
+    if (frame->fps != 0)
+    {
+      targetPlaybackPosition += 1000 / (double)frame->fps;
+    }
+
+    /* Step 4: Wait for additional vsync signals */
+
+    // Calculate the number of vsync signals this frame should be displayed for
+    uint32_t syncInterval = 1;
+    if (frame->fps != 0)
+    {
+      syncInterval = refreshRate / frame->fps;
+    }
+
+    // Wait for additional vsync signals if this frame needs to be displayed for
+    // more than a single refresh
+    for (uint32_t i = 1; i < syncInterval; ++i)
+    {
+      if (FAILED(output->WaitForVBlank()))
+      {
+        fprintf(stderr, "[Platform_Win] ERROR: Failed to wait for vsync\n");
+        return false;
+      }
+    }
+    output->Release();
     return true;
   }
 
@@ -821,9 +910,9 @@ bool platform::createProjectorWindow(uint32_t x, uint32_t y, bool scaleToFit,
   return gProjectorWindow->createWindow(x, y, scaleToFit, refreshRate);
 }
 
-bool platform::displayProjectorFrame(shared_ptr<FrameWrapper> wrapper)
+bool platform::displayProjectorFrame(shared_ptr<FrameWrapper> wrapper, uint32_t& delayMs)
 {
-  return gProjectorWindow->displayFrame(wrapper);
+  return gProjectorWindow->displayFrame(wrapper, delayMs);
 }
 
 void platform::destroyProjectorWindow()

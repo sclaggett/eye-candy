@@ -4,20 +4,18 @@
 
 using namespace std;
 
-FfmpegPlaybackProcess::FfmpegPlaybackProcess(string exec, string videoPath) :
+FfmpegPlaybackProcess::FfmpegPlaybackProcess(string exec, string videoPath,
+    uint32_t w, uint32_t h) :
   Thread("ffmpegplayback"),
-  executable(exec)
+  executable(exec),
+  width(w),
+  height(h)
 {
-  // Input options
   arguments.push_back("-i");
   arguments.push_back(videoPath);
 
-  // Output options
-  //arguments.push_back("-c:v");
-  //arguments.push_back("rawvideo");
-
   arguments.push_back("-f");
-  arguments.push_back("image2pipe");  //rawvideo");
+  arguments.push_back("image2pipe");
 
   arguments.push_back("-pix_fmt");
   arguments.push_back("bgra");
@@ -47,8 +45,9 @@ uint32_t FfmpegPlaybackProcess::run()
   {
     return 1;
   }
+  uint32_t frameSize = width * height * 4;
   stdoutReader = shared_ptr<PipeReader>(new PipeReader("ffmpegplayback_stdout",
-    processStdout, 10 * 1000 * 1000));
+    processStdout, 5 * frameSize));
   stderrReader = shared_ptr<PipeReader>(new PipeReader("ffmpegplayback_stderr",
     processStderr));
   if (!stdoutReader->spawn() || !stderrReader->spawn())

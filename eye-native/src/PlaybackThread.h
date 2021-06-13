@@ -12,7 +12,7 @@ public:
   PlaybackThread(uint32_t x, uint32_t y, std::vector<std::string> videos,
     bool scaleToFit, std::string ffmpegPath, std::string ffprobePath,
     wrapper::JsCallback* logCallback, wrapper::JsCallback* durationCallback,
-    wrapper::JsCallback* positionCallback);
+    wrapper::JsCallback* positionCallback, wrapper::JsCallback* delayCallback);
   virtual ~PlaybackThread() {};
 
   void setPreviewChannel(std::string channelName);
@@ -34,6 +34,7 @@ private:
   wrapper::JsCallback* logCallback;
   wrapper::JsCallback* durationCallback;
   wrapper::JsCallback* positionCallback;
+  wrapper::JsCallback* delayCallback;
   std::string channelName;
   std::mutex channelMutex;
 };

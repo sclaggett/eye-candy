@@ -82,13 +82,13 @@ function closeVideoOutput() {
  * getDisplayFrequency() allows us to get a monitor's display frequency.
  */
 
-function beginVideoPlayback(x, y, videos, scaleToFit, playbackDuration,
-    playbackPosition) {
+function beginVideoPlayback(x, y, videos, scaleToFit, durationCallback,
+    positionCallback, delayCallback) {
   if (native === null) {
     throw new Error('Native module has not been initialized');
   }
-  return native.beginVideoPlayback(x, y, videos, scaleToFit, playbackDuration,
-    playbackPosition);
+  return native.beginVideoPlayback(x, y, videos, scaleToFit, durationCallback,
+    positionCallback, delayCallback);
 }
 
 function endVideoPlayback() {
