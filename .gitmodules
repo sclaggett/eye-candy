@@ -1,0 +1,3 @@
+[submodule "eye-candy-jxi"]
+	path = eye-candy-jxi
+	url = git@github.com:sclaggett/eye-candy-jxi.git
