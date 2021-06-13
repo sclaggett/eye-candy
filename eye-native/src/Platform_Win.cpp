@@ -6,6 +6,7 @@
 #include <d2d1_3.h>
 #include <algorithm>
 #include <wrl.h>
+#include <sstream>
 
 using namespace std;
 using namespace Microsoft::WRL;
@@ -48,7 +49,7 @@ public:
   ProjectorWindow() {};
   virtual ~ProjectorWindow() {};
 
-  bool createWindow(uint32_t x, uint32_t y, bool scale, uint32_t refresh)
+  bool createWindow(uint32_t x, uint32_t y, bool scale, uint32_t refresh, string& error)
   {
     // Remember the scaling mode and refresh rate
     scaleToFit = scale;
@@ -61,7 +62,9 @@ public:
     hMonitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
     if (hMonitor == nullptr)
     {
-      fprintf(stderr, "[Platform_Win] ERROR: Failed to find monitor from point (%i, %i)\n", x, y);
+      stringstream errStr;
+      errStr << "Failed to find monitor from point (" << x << ", " << y << ")\n";
+      error = errStr.str();
       return false;
     }
 
@@ -71,7 +74,7 @@ public:
     info.cbSize = sizeof(MONITORINFO);
     if (!GetMonitorInfoA(hMonitor, &info))
     {
-      fprintf(stderr, "[Platform_Win] ERROR: Failed to get monitor info\n");
+      error = "Failed to get monitor info";
       return false;
     }
     width = info.rcMonitor.right - info.rcMonitor.left;
@@ -80,14 +83,10 @@ public:
     // Create an instance of this class on the projector monitor and show it
     if (!Create(nullptr, _T("EyeCandy"), WS_OVERLAPPEDWINDOW, CRect(info.rcMonitor)))
     {
-      fprintf(stderr, "[Platform_Win] ERROR: Failed to create window\n");
+      error = "Failed to create window";
       return false;
     }
     ShowWindow(SW_SHOW);
-
-    // TODO: enumerate display modes, and initialize the swap chain description correctly before
-    // you create the swap chain. This will ensure maximum performance when flipping in full-screen
-    // mode and avoid the extra memory overhead.
 
     // Create the swap chain
     DXGI_SWAP_CHAIN_DESC swapChainDesc;
@@ -95,8 +94,8 @@ public:
     swapChainDesc.BufferCount = 2;
     swapChainDesc.BufferDesc.Width = width;
     swapChainDesc.BufferDesc.Height = height;
-    swapChainDesc.BufferDesc.RefreshRate.Numerator = 0;
-    swapChainDesc.BufferDesc.RefreshRate.Denominator = 0;
+    swapChainDesc.BufferDesc.RefreshRate.Numerator = refreshRate;
+    swapChainDesc.BufferDesc.RefreshRate.Denominator = 1;
     swapChainDesc.BufferDesc.Format = TARGET_FORMAT;
     swapChainDesc.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
     swapChainDesc.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
@@ -106,24 +105,24 @@ public:
     swapChainDesc.OutputWindow = m_hWnd;
     swapChainDesc.Windowed = true;
     swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-    swapChainDesc.Flags = 0;  //DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+    swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
     if (FAILED(D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE,
       nullptr, D3D11_CREATE_DEVICE_BGRA_SUPPORT, nullptr, 0, D3D11_SDK_VERSION, &swapChainDesc,
       &dxgiSwapChain, &d3dDevice, nullptr, &d3dContext)))
     {
-      fprintf(stderr, "[Platform_Win] ERROR: Failed to create swap chain\n");
+      error = "Failed to create swap chain";
       return false;
     }
 
     // Create the Direct2D factory and the DirectX resources
     if (FAILED(D2D1CreateFactory<ID2D1Factory>(D2D1_FACTORY_TYPE_SINGLE_THREADED, &d2dFactory)))
     {
-      fprintf(stderr, "[Platform_Win] ERROR: Failed to create 2D factory\n");
+      error = "Failed to create 2D factory";
       return false;
     }
     if (!CreateResources())
     {
-      fprintf(stderr, "[Platform_Win] ERROR: Failed to create resources\n");
+      error = "Failed to create resources";
       return false;
     }
 
@@ -131,7 +130,7 @@ public:
     BOOL fullscreen;
     if (FAILED(dxgiSwapChain->GetFullscreenState(&fullscreen, nullptr)))
     {
-      fprintf(stderr, "[Platform_Win] ERROR: Failed to get fullscreen state\n");
+      error = "Failed to get fullscreen state";
       return false;
     }
     if (!fullscreen)
@@ -195,60 +194,39 @@ public:
     d2dRenderTarget = nullptr;
   }
 
-    /*
-    // Detect the output monitor's current refresh rate and switch to our desired
-    // settings if we aren't there already
-    IDXGIOutput* output;
+  bool displayFrame(shared_ptr<FrameWrapper> frame, uint32_t& delayMs, string& error)
+  {
+    // Hack: Check the current refresh rate and blow up if it doesn't match our target. We shouldn't
+    // have to do this--we should switch the projector to the correct refresh rate, preferrably during
+    // swap chain creation or on resize. But I'm having difficulty getting that to work so I'm working
+    // around it in order to get the rest of the system up and running. Properly setting the refresh
+    // rate is being left as an exercise to you, dear reader. Or you can be a lazy hack too and just
+    // force the target refresh rate in advanced display settings.
+    ComPtr<IDXGIOutput> output;
     if (FAILED(dxgiSwapChain->GetContainingOutput(&output)))
     {
-      fprintf(stderr, "[Platform_Win] ERROR: Failed to get monitor\n");
+      error = "Failed to get containing output";
       return false;
     }
     DXGI_MODE_DESC emptyMode = {};
     DXGI_MODE_DESC currentMode;
-    if (FAILED(output->FindClosestMatchingMode(&emptyMode, &currentMode, d3dDevice)))
+    memset(&currentMode, 0, sizeof(DXGI_MODE_DESC));
+    if (FAILED(output->FindClosestMatchingMode(&emptyMode, &currentMode, d3dDevice.Get())))
     {
-      fprintf(stderr, "[Platform_Win] ERROR: Failed to get current frame rate\n");
+      error = "Failed to get current frame rate";
       return false;
     }
+    uint32_t framesPerSecond = currentMode.RefreshRate.Numerator / currentMode.RefreshRate.Denominator;
     if (((currentMode.RefreshRate.Numerator % currentMode.RefreshRate.Denominator) != 0) ||
-      ((currentMode.RefreshRate.Numerator / currentMode.RefreshRate.Denominator) != refreshRate))
+      (framesPerSecond != refreshRate))
     {
-      fprintf(stderr, "## Need to update frame rate: %i/%i\n", currentMode.RefreshRate.Numerator,
-        currentMode.RefreshRate.Denominator);
-      memset(&swapChainDesc, 0, sizeof(DXGI_SWAP_CHAIN_DESC));
-      if (FAILED(dxgiSwapChain->GetDesc(&swapChainDesc)))
-      {
-        fprintf(stderr, "[Platform_Win] ERROR: Failed to get swap chain description\n");
-        return false;
-      }
-      DXGI_MODE_DESC targetModeDesc;
-      memset(&targetModeDesc, 0, sizeof(DXGI_MODE_DESC));
-      targetModeDesc.Width = swapChainDesc.BufferDesc.Width;
-      targetModeDesc.Height = swapChainDesc.BufferDesc.Height;
-      targetModeDesc.RefreshRate.Numerator = refreshRate;
-      targetModeDesc.RefreshRate.Denominator = 1;
-      targetModeDesc.Format = DXGI_FORMAT_UNKNOWN;
-      targetModeDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
-      targetModeDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
-      if (FAILED(dxgiSwapChain->ResizeTarget(&(targetModeDesc))))
-      {
-        fprintf(stderr, "[Platform_Win] ERROR: Failed to change refresh rate\n");
-        return false;
-      }
-      if (FAILED(dxgiSwapChain->ResizeBuffers(0, targetModeDesc.Width, targetModeDesc.Height,
-        TARGET_FORMAT, DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH)))
-      {
-        fprintf(stderr, "[Platform_Win] ERROR: Failed to resize the swap chain\n");
-      }
-      fprintf(stderr, "## Switch to mode: %i/%i\n", targetModeDesc.RefreshRate.Numerator,
-        targetModeDesc.RefreshRate.Denominator);
+      stringstream errStr;
+      errStr << "Actual refresh rate (" << framesPerSecond << ") does not match target rate (" << 
+        refreshRate << "). Try setting refresh rate in advanced video settings.";
+      error = errStr.str();
+      return false;
     }
-    output->Release();
-    */
 
-  bool displayFrame(shared_ptr<FrameWrapper> frame, uint32_t& delayMs)
-  {
     /* Step 1: Draw the frame to the back buffer */
 
     // Start with a solid black background
@@ -265,7 +243,7 @@ public:
       D2D1::SizeU(frame->nativeWidth, frame->nativeHeight),
       frame->nativeFrame, frame->nativeWidth * 4, &bitmapProperties, &bitmap)))
     {
-      fprintf(stderr, "[Platform_Win] ERROR: Failed to create bitmap\n");
+      error = "Failed to create bitmap";
       return false;
     }
 
@@ -287,22 +265,16 @@ public:
       D2D1_BITMAP_INTERPOLATION_MODE_LINEAR, &srcRectangle);
     if (FAILED(d2dRenderTarget->EndDraw()))
     {
-      fprintf(stderr, "[Platform_Win] ERROR: Failed to draw to context\n");
+      error = "Failed to draw to context";
       return false;
     }
 
     /* Step 2: Wait for vsync and present the frame */
     
     // Wait until the next vsync signal and present the frame
-    IDXGIOutput* output;
-    if (FAILED(dxgiSwapChain->GetContainingOutput(&output)))
-    {
-      fprintf(stderr, "[Platform_Win] ERROR: Failed to get containing output\n");
-      return false;
-    }
     if (FAILED(output->WaitForVBlank()))
     {
-      fprintf(stderr, "[Platform_Win] ERROR: Failed to wait for vsync\n");
+      error = "Failed to wait for vsync";
       return false;
     }
 
@@ -310,8 +282,11 @@ public:
     HRESULT hr = dxgiSwapChain->Present(0, 0);
     if (FAILED(hr))
     {
-      _com_error err(hr);
-      fprintf(stderr, "[Platform_Win] ERROR: Failed to present frame: 0x%x, %s\n", hr, err.ErrorMessage());
+      _com_error errCom(hr);
+      stringstream errStr;
+      errStr << "Failed to present frame: " << hex << hr << ", " <<
+        errCom.ErrorMessage();
+      error = errStr.str();
       return false;
     }
 
@@ -364,15 +339,16 @@ public:
     {
       if (FAILED(output->WaitForVBlank()))
       {
-        fprintf(stderr, "[Platform_Win] ERROR: Failed to wait for vsync\n");
+        error = "Failed to wait for vsync";
         return false;
       }
     }
-    output->Release();
     return true;
   }
 
-    /*
+    /* Below is logic to check the current frame rate during displayFrame() and try to switch to
+     * the correct refresh rate.
+
     // Get a reference to the monitor
     IDXGIOutput* output;
     if (FAILED(dxgiSwapChain->GetContainingOutput(&output)))
@@ -436,16 +412,6 @@ public:
       framesPerSecond = frame->fps;
       fprintf(stderr, "## Refresh rate changed\n");
     }
-
-    // Wait for vertical blank
-    // Note: This may not be necessary since we're passing 1 to Present()
-    HRESULT hr = output->WaitForVBlank();
-    output->Release();
-    if (FAILED(hr))
-    {
-      fprintf(stderr, "[Platform_Win] ERROR: Failed to wait for vsync\n");
-      return false;
-    }
     */
 
   void destroyWindow()
@@ -492,9 +458,10 @@ public:
 
     if (dxgiSwapChain != nullptr)
     {
-      // Release all outstanding DirectX resources, resize the swap chain, and recreate the DirectX resources
+      // Release all outstanding DirectX resources, resize the swap chain, and recreate
+      // the DirectX resources
       DeleteResources();
-      if (FAILED(dxgiSwapChain->ResizeBuffers(0, 0, 0, DXGI_FORMAT_UNKNOWN, 0)))
+      if (FAILED(dxgiSwapChain->ResizeBuffers(0, 0, 0, TARGET_FORMAT, 0)))
       {
         fprintf(stderr, "[Platform_Win] ERROR: Failed to resize the swap chain\n");
         return;
@@ -899,20 +866,21 @@ vector<uint32_t> platform::getDisplayFrequencies(int32_t x, int32_t y)
 
 ProjectorWindow* gProjectorWindow = nullptr;
 bool platform::createProjectorWindow(uint32_t x, uint32_t y, bool scaleToFit,
-  uint32_t refreshRate)
+  uint32_t refreshRate, std::string& error)
 {
   if (gProjectorWindow != nullptr)
   {
-    fprintf(stderr, "[Platform_Win] ERROR: Projector window already exists, cannot create\n");
+    error = "Projector window already exists, cannot create";
     return false;
   }
   gProjectorWindow = new ProjectorWindow();
-  return gProjectorWindow->createWindow(x, y, scaleToFit, refreshRate);
+  return gProjectorWindow->createWindow(x, y, scaleToFit, refreshRate, error);
 }
 
-bool platform::displayProjectorFrame(shared_ptr<FrameWrapper> wrapper, uint32_t& delayMs)
+bool platform::displayProjectorFrame(shared_ptr<FrameWrapper> wrapper, uint32_t& delayMs,
+  std::string& error)
 {
-  return gProjectorWindow->displayFrame(wrapper, delayMs);
+  return gProjectorWindow->displayFrame(wrapper, delayMs, error);
 }
 
 void platform::destroyProjectorWindow()

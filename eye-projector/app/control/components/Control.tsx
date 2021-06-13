@@ -579,8 +579,8 @@ export default class Control extends React.Component<
     if (this.state.projDetected) {
       let refreshRates = '';
       for (let i = 0; i < this.state.projRefreshRates.length; i += 1) {
-        if (refreshRates.length > 500) {
-          refreshRates += ', ';
+        if (refreshRates.length !== 0) {
+          refreshRates += ',';
         }
         refreshRates += this.state.projRefreshRates[i];
       }

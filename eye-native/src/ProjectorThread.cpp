@@ -23,9 +23,11 @@ ProjectorThread::ProjectorThread(int32_t xi, int32_t yi, bool scale,
 
 uint32_t ProjectorThread::run()
 {
-  if (!platform::createProjectorWindow(x, y, scaleToFit, refreshRate))
+  string error;
+  if (!platform::createProjectorWindow(x, y, scaleToFit, refreshRate, error))
   {
-    wrapper::invokeJsCallback(logCallback, "ERROR: Failed to create projector window.\n");
+    wrapper::invokeJsCallback(logCallback, "ERROR: Failed to create projector window: " + 
+      error + "\n");
     return 1;
   }
   bool starting = true;
@@ -57,9 +59,10 @@ uint32_t ProjectorThread::run()
     // Display the frame on the projector. This function aligns with the monitor's
     // vsync signal and is the rate-limiting step in this thread
     uint32_t delayMs = 0;
-    if (!platform::displayProjectorFrame(wrapper, delayMs))
+    if (!platform::displayProjectorFrame(wrapper, delayMs, error))
     {
-      wrapper::invokeJsCallback(logCallback, "ERROR: Failed to display projector frame.\n");
+      wrapper::invokeJsCallback(logCallback, "ERROR: Failed to display projector frame: " +
+        error + "\n");
       platform::destroyProjectorWindow();
       return 1;
     }

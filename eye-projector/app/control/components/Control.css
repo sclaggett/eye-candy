@@ -143,6 +143,8 @@
   width: 100%;
   resize: none;
   height: 10em;
+  background-color: #ddd;
+  font-size: 1.2em;
 }
 
 .previewOuter {

@@ -163,7 +163,7 @@ const createControlWindow = async () => {
 
   controlWindow = new BrowserWindow({
     show: false,
-    width: 600,
+    width: 800,
     height: 850,
     webPreferences:
       (process.env.NODE_ENV === 'development' ||
