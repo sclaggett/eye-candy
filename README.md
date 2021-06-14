@@ -9,7 +9,7 @@
 
 **Step 1.** The main electron process creates the control window which allows the user to select an existing EyeCandy program or create a new one.
 
-<img src="images/EyeCandy1.png" width="70%" />
+<img src="images/EyeCandy1.png" width="60%" />
 
 **Step 2.** A chain of events is kicked off when the user runs an EyeCandy program. First, the program text is passed back to the main process which spawns a new virtual machine and loads the program into it. The main process also spawns an instance of *ffmpeg* and creates the offscreen stimulus window.
 
@@ -31,21 +31,21 @@ Frames are processed sequentially by the *RecordThread* and *PreviewSendThread*,
 
 The control window has its own instance of the native code and uses it to receive frames from the main process via the named pipe. This approach is far more efficient than burdening the main process with the task of transferring the video data between the main and renderer processes.
 
-<img src="images/EyeNative3.png" width="70%" />
+<img src="images/EyeNative3.png" width="60%" />
 
 ## EyeProjector program flow
 
 **Step 1.** The main electron process creates the control window which allows the user to select the video files that will be played during the experiment.
 
-<img src="images/EyeProjector1.png" width="70%" />
+<img src="images/EyeProjector1.png" width="50%" />
 
 **Step 2.** A chain of events is kicked off when the user runs the experiment. First, the description of the experiment is passed to the main process which spawns an instance of *ffmpeg* and create the stimulus window on the projector.
 
-<img src="images/EyeProjector2.png" width="70%" />
+<img src="images/EyeProjector2.png" width="60%" />
 
 **Step 3.** The *ffmpeg* process decodes each video into a series of frames which are passed to the stimulus window for projection and the control window for preview.
 
-<img src="images/EyeProjector3.png" width="70%" />
+<img src="images/EyeProjector3.png" width="60%" />
 
 **Native integration.** The video decoding and playback pipeline exists in the native layer and is composed of the *PlaybackThread*, *ProjectorThread*, and *PreviewSendThread*.
 
@@ -55,4 +55,4 @@ The *ProjectorThread* displays each frame on the projector at the desired frame 
 
 Finally, the *PreviewSendThread* transmits a copy of the recently played frame to the control window for display to the user as described above.
 
-<img src="images/EyeNative2.png" width="70%" />
+<img src="images/EyeNative2.png" width="50%" />
