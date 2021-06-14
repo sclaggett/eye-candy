@@ -134,6 +134,15 @@ uint32_t PlaybackThread::run()
   }
   uint32_t monitorRefreshRate = displayFrequencies.at(0);
 
+  // Initialize the timing card
+  if (!platform::initializeTimingCard())
+  {
+    wrapper::invokeJsCallback(logCallback, "ERROR: Failed to initialize timing card.\n");
+    wrapper::invokeJsCallback(durationCallback, 0);
+    wrapper::invokeJsCallback(positionCallback, 0);
+    return 1;
+  }
+
   // Notify the javascript of the total duration
   wrapper::invokeJsCallback(durationCallback, totalDurationMs);
   {
@@ -288,6 +297,7 @@ uint32_t PlaybackThread::run()
   delete previewSendThread;
   pendingFrameQueue = nullptr;
   previewFrameQueue = nullptr;
+  platform::releaseTimingCard();
   return 0;
 }
 

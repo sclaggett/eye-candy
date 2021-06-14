@@ -38,6 +38,10 @@ namespace platform
   bool createProjectorWindow(uint32_t x, uint32_t y, bool scaleToFit,
     uint32_t refreshRate, std::string& error);
   bool displayProjectorFrame(std::shared_ptr<FrameWrapper> wrapper,
-    uint32_t& delayMs, std::string& error);
+    uint64_t& timestamp, uint32_t& delayMs, std::string& error);
   void destroyProjectorWindow();
+
+  bool initializeTimingCard();
+  uint64_t readTimestamp();
+  void releaseTimingCard();
 }

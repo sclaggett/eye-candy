@@ -89,7 +89,8 @@
           "opencv/win/include/"
         ],
         'library_dirs': [
-          "opencv/win/lib/"
+          "opencv/win/lib/",
+          "../eye-candy-jxi/lib/"
         ],
         'msvs_settings': {
           'VCCLCompilerTool': {
@@ -103,13 +104,15 @@
           "Rpcrt4.lib",
           "D3D11.lib",
           "D2d1.lib",
-          "DXGI.lib"
+          "DXGI.lib",
+          "Jxi2PcieApi.lib"
         ],
         "copies":[
           {
             'destination': './build/Release',
             'files':[
-              'opencv/win/lib/opencv_world451.dll'
+              'opencv/win/lib/opencv_world451.dll',
+              '../eye-candy-jxi/lib/Jxi2PcieApi.dll'
             ]
           }
         ]

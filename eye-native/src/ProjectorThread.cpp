@@ -58,14 +58,18 @@ uint32_t ProjectorThread::run()
 
     // Display the frame on the projector. This function aligns with the monitor's
     // vsync signal and is the rate-limiting step in this thread
+    uint64_t timestamp = 0;
     uint32_t delayMs = 0;
-    if (!platform::displayProjectorFrame(wrapper, delayMs, error))
+    if (!platform::displayProjectorFrame(wrapper, timestamp, delayMs, error))
     {
       wrapper::invokeJsCallback(logCallback, "ERROR: Failed to display projector frame: " +
         error + "\n");
       platform::destroyProjectorWindow();
       return 1;
     }
+
+    // TODO: Save the frame timestamp to the run file
+    //fprintf(stderr, "Displayed frame %i at 0x%llx\n", wrapper->number, timestamp);
 
     // Notify the UI of our progress and pass the frame to the output queue
     uint32_t durationMs = (int32_t)(1000.0 / (double)wrapper->fps) + 1;

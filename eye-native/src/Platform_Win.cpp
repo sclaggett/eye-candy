@@ -8,6 +8,10 @@
 #include <wrl.h>
 #include <sstream>
 
+// Pull the JXI headers in from the private submodule
+#include "../../eye-candy-jxi/include/Jxi2PcieApi.h"
+#include "../../eye-candy-jxi/include/regdef.h"
+
 using namespace std;
 using namespace Microsoft::WRL;
 
@@ -194,7 +198,7 @@ public:
     d2dRenderTarget = nullptr;
   }
 
-  bool displayFrame(shared_ptr<FrameWrapper> frame, uint32_t& delayMs, string& error)
+  bool displayFrame(shared_ptr<FrameWrapper> frame, uint64_t& timestamp, uint32_t& delayMs, string& error)
   {
     // Hack: Check the current refresh rate and blow up if it doesn't match our target. We shouldn't
     // have to do this--we should switch the projector to the correct refresh rate, preferrably during
@@ -278,7 +282,7 @@ public:
       return false;
     }
 
-    // Present the frame immediately now that vsync has occurred
+    // Present the frame immediately and make a note of the timestamp
     HRESULT hr = dxgiSwapChain->Present(0, 0);
     if (FAILED(hr))
     {
@@ -289,6 +293,7 @@ public:
       error = errStr.str();
       return false;
     }
+    timestamp = platform::readTimestamp();
 
     /* Step 3: Record the time of frame presentation */
 
@@ -877,14 +882,73 @@ bool platform::createProjectorWindow(uint32_t x, uint32_t y, bool scaleToFit,
   return gProjectorWindow->createWindow(x, y, scaleToFit, refreshRate, error);
 }
 
-bool platform::displayProjectorFrame(shared_ptr<FrameWrapper> wrapper, uint32_t& delayMs,
-  std::string& error)
+bool platform::displayProjectorFrame(shared_ptr<FrameWrapper> wrapper, uint64_t& timestamp,
+  uint32_t& delayMs, std::string& error)
 {
-  return gProjectorWindow->displayFrame(wrapper, delayMs, error);
+  return gProjectorWindow->displayFrame(wrapper, timestamp, delayMs, error);
 }
 
 void platform::destroyProjectorWindow()
 {
   gProjectorWindow->destroyWindow();
   gProjectorWindow = nullptr;
+}
+
+HANDLE gJxiHandle = 0;
+BYTE* gJxiBase = nullptr;
+bool platform::initializeTimingCard()
+{
+  JXI2_STATUS status = Jxi2OpenSyncclock(&gJxiHandle, (void**)&gJxiBase);
+  if (status != JXI2_STATUS_OK)
+  {
+    fprintf(stderr, "[Platform_Win] ERROR: Failed to initialize timing card, status = %i\n",
+      status);
+    return false;
+  }
+  return true;
+}
+
+// In these two functions lay the secrets to getting the correct value from the
+// JXI timing card
+unsigned char ParseBCD(unsigned char bcd)
+{
+  unsigned char retVal = 0;
+  for (int i = 0; i < 2; ++i)
+  {
+    retVal += (bcd & 0xF) * (unsigned char)pow(10, i);
+    bcd = bcd >> 4;
+  }
+  return retVal;
+}
+unsigned long ParseBCD(unsigned long bcd)
+{
+  unsigned long retVal = 0;
+  for (int i = 0; i < 8; ++i)
+  {
+    retVal += (bcd & 0xF) * (unsigned long)pow(10, i);
+    bcd = bcd >> 4;
+  }
+  return retVal;
+}
+
+uint64_t platform::readTimestamp()
+{
+  uint64_t timestamp = 0;
+  if (gJxiBase != nullptr)
+  {
+    unsigned int timelo = ParseBCD(*(volatile unsigned long*)(gJxiBase + Sec10_Usec1_Port));
+    unsigned int timehi = ParseBCD(*(volatile unsigned long*)(gJxiBase + Year1_Min1_Port));
+    timestamp = (((uint64_t)timehi) << 32) | timelo;
+  }
+  return timestamp;
+}
+
+void platform::releaseTimingCard()
+{
+  if (gJxiHandle != 0)
+  {
+    Jxi2CloseSyncclock(gJxiHandle);
+    gJxiHandle = 0;
+    gJxiBase = nullptr;
+  }
 }
