@@ -1,7 +1,7 @@
 {
-  "name": "eye-projector",
+  "name": "eye-measure",
   "version": "0.4.0",
-  "description": "Eye Projector stimulus playback",
+  "description": "Eye Measure latency detection",
   "main": "./main/main.prod.js",
   "author": {
     "name": "Tyler Benster",

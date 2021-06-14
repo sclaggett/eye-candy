@@ -3,6 +3,7 @@
 - [eye-native](eye-native/README.md)
 - [eye-candy](eye-candy/README.md)
 - [eye-projector](eye-projector/README.md)
+- [eye-measure](eye-measure/README.md)
 
 ## EyeCandy program flow
 
