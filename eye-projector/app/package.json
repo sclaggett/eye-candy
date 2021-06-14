@@ -1,7 +1,7 @@
 {
   "name": "eye-candy",
   "version": "0.4.0",
-  "description": "Eye Candy stimulus generator",
+  "description": "Eye Candy stimulus playback",
   "main": "./main/main.prod.js",
   "author": {
     "name": "Tyler Benster",

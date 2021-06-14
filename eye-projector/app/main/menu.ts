@@ -70,10 +70,10 @@ export default class MenuBuilder {
 
   buildDarwinTemplate(): MenuItemConstructorOptions[] {
     const subMenuAbout: DarwinMenuItemConstructorOptions = {
-      label: 'EyeCandy',
+      label: 'EyeProjector',
       submenu: [
         {
-          label: 'About EyeCandy',
+          label: 'About EyeProjector',
           selector: 'orderFrontStandardAboutPanel:',
         },
         { type: 'separator' },
@@ -83,7 +83,7 @@ export default class MenuBuilder {
         },
         { type: 'separator' },
         {
-          label: 'Hide EyeCandy',
+          label: 'Hide EyeProjector',
           accelerator: 'Command+H',
           selector: 'hide:',
         },
