@@ -1,7 +1,7 @@
 {
-  "name": "eye-measure",
+  "name": "eye-calibrate",
   "version": "0.4.0",
-  "description": "Eye Measure latency detection",
+  "description": "Eye Calibrate latency detection",
   "main": "./main/main.prod.js",
   "author": {
     "name": "Tyler Benster",

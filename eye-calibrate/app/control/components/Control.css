@@ -1,0 +1,34 @@
+.container {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  padding-bottom: 5px;
+}
+
+.instructions {
+  padding: 8px;
+  font-size: 1.2em;
+}
+
+.measurementSetup {
+  background-image: url('../../resources/images/MeasurementSetup.png');
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: center;
+  border: none;
+  cursor: pointer;
+  height: 250px;
+}
+
+.status {
+  font-size: 2.5em;
+}
