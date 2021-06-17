@@ -1,6 +1,5 @@
 #pragma once
 
-#include <mutex>
 #include "Thread.h"
 #include "Wrapper.h"
 

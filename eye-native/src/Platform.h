@@ -44,6 +44,10 @@ namespace platform
   void destroyProjectorWindow();
 
   bool initializeTimingCard();
-  uint64_t readTimestamp();
+  uint64_t readTimestampUsec();
+  bool startExternalEventDetection();
+  void clearExternalEvent();
+  bool waitForExternalEvent(uint32_t timeoutMs, uint64_t& eventTimestampUsec);
+  void stopExternalEventDetection();
   void releaseTimingCard();
 }

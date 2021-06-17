@@ -146,6 +146,7 @@ public:
 
   bool CreateResources()
   {
+    /* Is this necessary?
     // Get buffer and create a render-target-view
     ComPtr<ID3D11Resource> backBuffer;
     if (FAILED(dxgiSwapChain->GetBuffer(0, __uuidof(ID3D11Resource), (LPVOID*)&backBuffer)))
@@ -170,6 +171,7 @@ public:
     viewport.TopLeftX = 0;
     viewport.TopLeftY = 0;
     d3dContext->RSSetViewports(1, &viewport);
+    */
 
     // Get swap chain surface
     ComPtr<IDXGISurface> dxgiSurface;
@@ -286,7 +288,7 @@ public:
       error = errStr.str();
       return false;
     }
-    timestamp = platform::readTimestamp();
+    timestamp = platform::readTimestampUsec();
 
     /* Step 3: Calculate any culmulative delay in the video playback */
 
@@ -344,8 +346,9 @@ public:
     return true;
   }
 
+  uint64_t lastTimestamp = 0;
   bool displayCalibrationFrame(bool whiteFrame, uint64_t& timestamp, string& error)
-  {
+  {    
     /* Step 1: Paint the background of the back buffer */
 
     // Start with a solid black background
@@ -364,9 +367,32 @@ public:
       return false;
     }
 
-    /* Step 2: Present the frame */
-    
-    // Present the frame when the next vsync occurs and make a note of the timestamp
+    /* Step 2: Wait for vsync */
+
+    // Waiting for vsync before calling Present(1) causes the latter to happen quickly but I don't
+    // see much advantage to this approach--we can skip the vsync wait and just call Present(1), which
+    // causes it to take care of the vsync detection.
+    /*
+    // Pause for the vsync signal
+    ComPtr<IDXGIOutput> output;
+    if (FAILED(dxgiSwapChain->GetContainingOutput(&output)))
+    {
+      error = "Failed to get containing output";
+      return false;
+    }
+    if (FAILED(output->WaitForVBlank()))
+    {
+      error = "Failed to wait for vsync";
+      return false;
+    }
+    */
+
+    /* Step 3: Present the frame */
+
+    uint64_t beforePresentTs = platform::readTimestampUsec();
+    //timestamp = beforePresentTs;
+
+    // Present the frame
     HRESULT hr = dxgiSwapChain->Present(1, 0);
     if (FAILED(hr))
     {
@@ -377,7 +403,18 @@ public:
       error = errStr.str();
       return false;
     }
-    timestamp = platform::readTimestamp();
+
+    // Make a note of the timestamp
+    timestamp = platform::readTimestampUsec();
+
+    uint64_t afterPresentTs = timestamp;
+    uint64_t presentTime = afterPresentTs - beforePresentTs;
+    uint64_t timeOutside = beforePresentTs - lastTimestamp;
+    uint64_t cycleTime = afterPresentTs - lastTimestamp;
+    lastTimestamp = afterPresentTs;
+    //fprintf(stderr, "Present %0.2f, outside %0.2f, cycle %0.2f\n", (float)presentTime / 1000,
+    //  (float)timeOutside / 1000, (float)cycleTime / 1000);
+
     return true;
   }
 
@@ -863,6 +900,7 @@ void platform::destroyProjectorWindow()
 
 HANDLE gJxiHandle = 0;
 BYTE* gJxiBase = nullptr;
+PJXI2_NOTIFICATION_HANDLE gNotificationHandle = 0;
 bool platform::initializeTimingCard()
 {
   JXI2_STATUS status = Jxi2OpenSyncclock(&gJxiHandle, (void**)&gJxiBase);
@@ -898,16 +936,118 @@ unsigned long ParseBCD(unsigned long bcd)
   return retVal;
 }
 
-uint64_t platform::readTimestamp()
+uint64_t platform::readTimestampUsec()
 {
-  uint64_t timestamp = 0;
-  if (gJxiBase != nullptr)
+  if (gJxiBase == nullptr)
   {
-    unsigned int timelo = ParseBCD(*(volatile unsigned long*)(gJxiBase + Sec10_Usec1_Port));
-    unsigned int timehi = ParseBCD(*(volatile unsigned long*)(gJxiBase + Year1_Min1_Port));
-    timestamp = (((uint64_t)timehi) << 32) | timelo;
+    fprintf(stderr, "[Platform_Win] ERROR: Timing card has not been initialized\n");
+    return 0;
   }
-  return timestamp;
+  unsigned int timelo = ParseBCD(*(volatile unsigned long*)(gJxiBase + Sec10_Usec1_Port));
+  unsigned int timehi = ParseBCD(*(volatile unsigned long*)(gJxiBase + Year1_Min1_Port));
+  return (((uint64_t)timehi) << 32) | timelo;
+}
+
+bool platform::startExternalEventDetection()
+{
+  if (gJxiBase == nullptr)
+  {
+    fprintf(stderr, "[Platform_Win] ERROR: Timing card has not been initialized\n");
+    return false;
+  }
+  if (gNotificationHandle != 0)
+  {
+    fprintf(stderr, "[Platform_Win] ERROR: External event detection is already running\n");
+    return false;
+  }
+
+  // Disable all interrupts
+  *(volatile unsigned char*)(gJxiBase + Control_Port) = 0;
+
+  // Register for notifications from JXI's library
+  JXI2_STATUS status = Jxi2RegisterForNotification(gJxiHandle, &gNotificationHandle);
+  if (status != JXI2_STATUS_OK)
+  {
+    fprintf(stderr, "[Platform_Win] ERROR: Failed to register for notifications, status = %d\n",
+      status);
+    return false;
+  }
+
+  // Start listening
+  *(volatile unsigned char*)(gJxiBase + Control_Port) = Ext_Intr_Enb;
+  return true;
+}
+
+void platform::clearExternalEvent()
+{
+  if (gJxiBase == nullptr)
+  {
+    fprintf(stderr, "[Platform_Win] ERROR: Timing card has not been initialized\n");
+    return;
+  }
+
+  // Clear the external event tag if set
+  unsigned char extstatus = *(volatile unsigned char*)(gJxiBase + Status_Port);
+  if ((extstatus & Ext_Ready) != 0)
+  {
+    unsigned int exttimelo = *(volatile unsigned long*)(gJxiBase + Ext_Sec10_Usec1_Port);
+    unsigned int exttimehi = *(volatile unsigned long*)(gJxiBase + Ext_Year1_Min1_Port);
+    unsigned char exttime100ns = *(volatile unsigned char*)(gJxiBase + Ext_100ns_Port);
+  }
+}
+
+bool platform::waitForExternalEvent(uint32_t timeoutMs, uint64_t& eventTimestampUs)
+{
+  if (gJxiBase == nullptr)
+  {
+    fprintf(stderr, "[Platform_Win] ERROR: Timing card has not been initialized\n");
+    return false;
+  }
+  if (gNotificationHandle == 0)
+  {
+    fprintf(stderr, "[Platform_Win] ERROR: External event detection is not running\n");
+    return false;
+  }
+
+  // Wait up to timeoutMs for an external event to occur
+  JXI2_STATUS status = Jxi2WaitForNotification(gJxiHandle, gNotificationHandle, timeoutMs, true);
+  if (status == JXI2_STATUS_TIMEOUT)
+  {
+    return false;;
+  }
+  if (status != JXI2_STATUS_OK)
+  {
+    fprintf(stderr, "[Platform_Win] ERROR: Failed to wait for notification, status = %d\n",
+      status);
+    return false;
+  }
+
+  // Remember the timestamp in microseconds
+  unsigned char extstatus = *(volatile unsigned char*)(gJxiBase + Status_Port);
+  if ((extstatus & Ext_Ready) == 0)
+  {
+    return false;
+  }
+  unsigned int timelo = ParseBCD(*(volatile unsigned long*)(gJxiBase + Ext_Sec10_Usec1_Port));
+  unsigned int timehi = ParseBCD(*(volatile unsigned long*)(gJxiBase + Ext_Year1_Min1_Port));
+  eventTimestampUs = (((uint64_t)timehi) << 32) | timelo;
+  return true;
+}
+
+void platform::stopExternalEventDetection()
+{
+  if ((gJxiBase == nullptr) || (gNotificationHandle == 0))
+  {
+    return;
+  }
+
+  // Disable all interrupts
+  *(gJxiBase + Control_Port) = 0;
+
+  // Not strictly necessary, as any outstanding notifications will be 
+  // cleaned up when closing the device
+  Jxi2UnregisterNotification(gJxiHandle, gNotificationHandle);
+  gNotificationHandle = 0;
 }
 
 void platform::releaseTimingCard()

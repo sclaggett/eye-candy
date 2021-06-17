@@ -1,4 +1,5 @@
 #include "CalibrationThread.h"
+#include "ExternalEventThread.h"
 #include "Platform.h"
 
 using namespace std;
@@ -6,7 +7,7 @@ using namespace std;
 CalibrationThread::CalibrationThread(uint32_t x1, uint32_t y1,
     wrapper::JsCallback* error, wrapper::JsCallback* noSignal,
     wrapper::JsCallback* avgLatency) :
-  Thread("playback"),
+  Thread("calibration"),
   x(x1),
   y(y1),
   errorCallback(error),
@@ -31,10 +32,30 @@ uint32_t CalibrationThread::run()
     return 1;
   }
 
+  // Spawn the external event thread
+  shared_ptr<ExternalEventThread> externalEventThread = shared_ptr<ExternalEventThread>(
+    new ExternalEventThread());
+  externalEventThread->spawn();
+
   // Calibration loop
   int count = 0;
+  uint64_t whiteFrameTimestamp = 0;
   while (!checkForExit())
   {
+    // Make sure the external event thread is still running and check if it has detected anything
+    if (!externalEventThread->isRunning())
+    {
+      wrapper::invokeJsCallback(errorCallback, "ERROR: External event thread died\n");
+      break;
+    }
+    uint64_t eventTimestamp = externalEventThread->getEventTimestamp();
+    if ((eventTimestamp != 0) && (whiteFrameTimestamp != 0) && (eventTimestamp > whiteFrameTimestamp))
+    {
+      uint32_t deltaMs = (uint32_t)((eventTimestamp - whiteFrameTimestamp) / 1000);
+      fprintf(stderr, "## Delta = %i ms\n", deltaMs);
+      whiteFrameTimestamp = 0;
+    }
+
     // Determine if the next frame and black or white and detect the first white frame we
     // display after a period of darkness
     bool whiteFrame = (count >= 6);
@@ -54,7 +75,9 @@ uint32_t CalibrationThread::run()
     // Remember the timestamp if this is the first white frame and increment the count
     if (firstWhiteFrame)
     {
-      // Record timestamp
+      platform::clearExternalEvent();
+      whiteFrameTimestamp = timestamp;
+      //fprintf(stderr, "## White frame %lli\n", whiteFrameTimestamp);
     }
     count += 1;
     if (count == 12)
@@ -63,6 +86,10 @@ uint32_t CalibrationThread::run()
     }
   }
 
+  if (externalEventThread->isRunning())
+  {
+    externalEventThread->terminate();
+  }
   platform::destroyProjectorWindow();
   platform::releaseTimingCard();
   return 0;
