@@ -4,6 +4,7 @@
     "cflags!": [ "-fno-exceptions" ],
     "cflags_cc!": [ "-fno-exceptions" ],
     "sources": [
+      "src/CalibrationThread.cpp",
       "src/FfmpegPlaybackProcess.cpp",
       "src/FfmpegRecordProcess.cpp",
       "src/FfprobeProcess.cpp",

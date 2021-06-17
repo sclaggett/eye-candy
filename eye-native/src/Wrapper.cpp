@@ -21,6 +21,9 @@ Napi::Object wrapper::Init(Napi::Env env, Napi::Object exports)
   exports.Set("openPreviewChannel", Napi::Function::New(env, wrapper::openPreviewChannel));
   exports.Set("getNextFrame", Napi::Function::New(env, wrapper::getNextFrame));
   exports.Set("closePreviewChannel", Napi::Function::New(env, wrapper::closePreviewChannel));
+
+  exports.Set("beginCalibration", Napi::Function::New(env, wrapper::beginCalibration));
+  exports.Set("endCalibration", Napi::Function::New(env, wrapper::endCalibration));
   return exports;
 }
 
@@ -293,4 +296,31 @@ void wrapper::closePreviewChannel(const Napi::CallbackInfo& info)
 {
   Napi::Env env = info.Env();
   native::closePreviewChannel(env);
+}
+
+Napi::String wrapper::beginCalibration(const Napi::CallbackInfo& info)
+{
+  Napi::Env env = info.Env();
+  if ((info.Length() != 4) ||
+    !info[0].IsNumber() ||
+    !info[1].IsNumber() ||
+    !info[2].IsFunction() ||
+    !info[3].IsFunction())
+  {
+    Napi::TypeError::New(env, "Incorrect parameter type").ThrowAsJavaScriptException();
+    return Napi::String();
+  }
+  Napi::Number x = info[0].As<Napi::Number>();
+  Napi::Number y = info[1].As<Napi::Number>();
+  Napi::Function noSignalCallback = info[2].As<Napi::Function>();
+  wrapper::JsCallback* noSignalJsCallback = createJsCallback(env, noSignalCallback);
+  Napi::Function avgLatencyCallback = info[3].As<Napi::Function>();
+  wrapper::JsCallback* avgLatencyJsCallback = createJsCallback(env, avgLatencyCallback);
+  return Napi::String::New(env, native::beginCalibration(env, x, y, noSignalJsCallback,
+    avgLatencyJsCallback));
+}
+
+void wrapper::endCalibration(const Napi::CallbackInfo& info)
+{
+  native::endCalibration(info.Env());
 }

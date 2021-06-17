@@ -1,4 +1,5 @@
 #include "Native.h"
+#include "CalibrationThread.h"
 #include "Platform.h"
 #include "PlaybackThread.h"
 #include "PreviewReceiveThread.h"
@@ -13,7 +14,7 @@ using namespace cv;
 // Global variables
 string gFfmpegPath, gFfprobePath;
 wrapper::JsCallback* gLogCallback = 0;
-bool gInitialized = false, gRecording = false, gPlaying = false;
+bool gInitialized = false, gRecording = false, gPlaying = false, gCalibrating = false;
 uint32_t gNextFrameId = 0, gWidth = 0, gHeight = 0;
 shared_ptr<Queue<shared_ptr<FrameWrapper>>> gPendingFrameQueue(new Queue<shared_ptr<FrameWrapper>>());
 shared_ptr<Queue<shared_ptr<FrameWrapper>>> gCompletedFrameQueue(new Queue<shared_ptr<FrameWrapper>>());
@@ -21,6 +22,7 @@ shared_ptr<Queue<Mat*>> gPendingPreviewQueue(new Queue<Mat*>());
 shared_ptr<RecordThread> gRecordThread(nullptr);
 shared_ptr<PlaybackThread> gPlaybackThread(nullptr);
 shared_ptr<PreviewReceiveThread> gPreviewReceiveThread(nullptr);
+shared_ptr<CalibrationThread> gCalibrationThread(nullptr);
 
 void native::initialize(Napi::Env env, string ffmpegPath, string ffprobePath,
   wrapper::JsCallback* logCallback)
@@ -268,4 +270,44 @@ void native::closePreviewChannel(Napi::Env env)
 void native::deletePreviewFrame(napi_env env, void* finalize_data, void* finalize_hint)
 {
   delete[] reinterpret_cast<uint8_t*>(finalize_data);
+}
+
+string native::beginCalibration(Napi::Env env, int32_t x, int32_t y,
+  wrapper::JsCallback* noSignalJsCallback, wrapper::JsCallback* avgLatencyJsCallback)
+{
+  // Make sure we've been initialized and aren't currently calibrating
+  if (!gInitialized)
+  {
+    return "Library has not been initialized";
+  }
+  if (gCalibrating)
+  {
+    return "Calibration already in progress";
+  }
+
+  // Spawn the calibration thread that will generate a series of black and white frames
+  // and use them to measure the latency in the projection system
+  gCalibrationThread = shared_ptr<CalibrationThread>(new CalibrationThread(x, y,
+    gLogCallback, noSignalJsCallback, avgLatencyJsCallback));
+  gCalibrationThread->spawn();
+
+  gCalibrating = true;
+  return "";
+}
+
+void native::endCalibration(Napi::Env env)
+{
+  if (!gCalibrating)
+  {
+    return;
+  }
+  if (gCalibrationThread != nullptr)
+  {
+    if (gCalibrationThread->isRunning())
+    {
+      gCalibrationThread->terminate();
+    }
+    gCalibrationThread = nullptr;
+  }
+  gCalibrating = false;
 }

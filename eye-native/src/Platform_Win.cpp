@@ -198,7 +198,7 @@ public:
     d2dRenderTarget = nullptr;
   }
 
-  bool displayFrame(shared_ptr<FrameWrapper> frame, uint64_t& timestamp, uint32_t& delayMs, string& error)
+  bool displayVideoFrame(shared_ptr<FrameWrapper> frame, uint64_t& timestamp, uint32_t& delayMs, string& error)
   {
     // Hack: Check the current refresh rate and blow up if it doesn't match our target. We shouldn't
     // have to do this--we should switch the projector to the correct refresh rate, preferrably during
@@ -273,17 +273,10 @@ public:
       return false;
     }
 
-    /* Step 2: Wait for vsync and present the frame */
+    /* Step 2: Present the frame */
     
-    // Wait until the next vsync signal and present the frame
-    if (FAILED(output->WaitForVBlank()))
-    {
-      error = "Failed to wait for vsync";
-      return false;
-    }
-
-    // Present the frame immediately and make a note of the timestamp
-    HRESULT hr = dxgiSwapChain->Present(0, 0);
+    // Present the frame when the next vsync occurs and make a note of the timestamp
+    HRESULT hr = dxgiSwapChain->Present(1, 0);
     if (FAILED(hr))
     {
       _com_error errCom(hr);
@@ -295,7 +288,7 @@ public:
     }
     timestamp = platform::readTimestamp();
 
-    /* Step 3: Record the time of frame presentation */
+    /* Step 3: Calculate any culmulative delay in the video playback */
 
     // Initialize timing
     if (!timingInitialized)
@@ -351,73 +344,42 @@ public:
     return true;
   }
 
-    /* Below is logic to check the current frame rate during displayFrame() and try to switch to
-     * the correct refresh rate.
+  bool displayCalibrationFrame(bool whiteFrame, uint64_t& timestamp, string& error)
+  {
+    /* Step 1: Paint the background of the back buffer */
 
-    // Get a reference to the monitor
-    IDXGIOutput* output;
-    if (FAILED(dxgiSwapChain->GetContainingOutput(&output)))
+    // Start with a solid black background
+    d2dRenderTarget->BeginDraw();
+    if (whiteFrame)
     {
-      fprintf(stderr, "[Platform_Win] ERROR: Failed to get monitor\n");
+      d2dRenderTarget->Clear(D2D1::ColorF(1, 1, 1, 1));
+    }
+    else
+    {
+      d2dRenderTarget->Clear(D2D1::ColorF(0, 0, 0, 1));
+    }
+    if (FAILED(d2dRenderTarget->EndDraw()))
+    {
+      error = "Failed to draw to context";
       return false;
     }
 
-    // Check the frame rate if we haven't already
-    if (framesPerSecond == 0)
+    /* Step 2: Present the frame */
+    
+    // Present the frame when the next vsync occurs and make a note of the timestamp
+    HRESULT hr = dxgiSwapChain->Present(1, 0);
+    if (FAILED(hr))
     {
-      DXGI_MODE_DESC emptyMode = {};
-      DXGI_MODE_DESC currentMode;
-      if (FAILED(output->FindClosestMatchingMode(&emptyMode, &currentMode, d3dDevice)))
-      {
-        fprintf(stderr, "[Platform_Win] ERROR: Failed to get current frame rate\n");
-        return false;
-      }
-      framesPerSecond = currentMode.RefreshRate.Numerator / currentMode.RefreshRate.Denominator;
-      fprintf(stderr, "## Current frame rate: %i\n", framesPerSecond);
+      _com_error errCom(hr);
+      stringstream errStr;
+      errStr << "Failed to present frame: " << hex << hr << ", " <<
+        errCom.ErrorMessage();
+      error = errStr.str();
+      return false;
     }
-
-    // Change the refresh rate if it doesn't match the current frame rate
-    if (framesPerSecond != frame->fps)
-    {
-      fprintf(stderr, "## Changing fps to %i\n", frame->fps);
-
-      DXGI_SWAP_CHAIN_DESC swapChainDesc;
-      memset(&swapChainDesc, 0, sizeof(DXGI_SWAP_CHAIN_DESC));
-      if (FAILED(dxgiSwapChain->GetDesc(&swapChainDesc)))
-      {
-        fprintf(stderr, "[Platform_Win] ERROR: Failed to get swap chain description\n");
-        return false;
-      }
-      DXGI_MODE_DESC targetModeDesc;
-      memset(&targetModeDesc, 0, sizeof(DXGI_MODE_DESC));
-      targetModeDesc.Width = swapChainDesc.BufferDesc.Width;
-      targetModeDesc.Height = swapChainDesc.BufferDesc.Height;
-      targetModeDesc.RefreshRate.Numerator = frame->fps;
-      targetModeDesc.RefreshRate.Denominator = 1;
-      targetModeDesc.Format = swapChainDesc.BufferDesc.Format;
-      targetModeDesc.Scaling = swapChainDesc.BufferDesc.Scaling;
-      DXGI_MODE_DESC emptyMode = {};
-      if (FAILED(output->FindClosestMatchingMode(&emptyMode, &targetModeDesc, d3dDevice)))
-      {
-        fprintf(stderr, "[Platform_Win] ERROR: Failed to find matching mode\n");
-        return false;
-      }
-      fprintf(stderr, "## Matching mode: %i/%i\n", targetModeDesc.RefreshRate.Numerator,
-        targetModeDesc.RefreshRate.Denominator);
-      if (FAILED(dxgiSwapChain->ResizeTarget(&(targetModeDesc))))
-      {
-        fprintf(stderr, "[Platform_Win] ERROR: Failed to change refresh rate\n");
-        return false;
-      }
-      if (FAILED(dxgiSwapChain->ResizeBuffers(0, targetModeDesc.Width, targetModeDesc.Height,
-        TARGET_FORMAT, DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH)))
-      {
-        fprintf(stderr, "[Platform_Win] ERROR: Failed to resize the swap chain\n");
-      }
-      framesPerSecond = frame->fps;
-      fprintf(stderr, "## Refresh rate changed\n");
-    }
-    */
+    timestamp = platform::readTimestamp();
+    return true;
+  }
 
   void destroyWindow()
   {
@@ -871,7 +833,7 @@ vector<uint32_t> platform::getDisplayFrequencies(int32_t x, int32_t y)
 
 ProjectorWindow* gProjectorWindow = nullptr;
 bool platform::createProjectorWindow(uint32_t x, uint32_t y, bool scaleToFit,
-  uint32_t refreshRate, std::string& error)
+  uint32_t refreshRate, string& error)
 {
   if (gProjectorWindow != nullptr)
   {
@@ -882,10 +844,15 @@ bool platform::createProjectorWindow(uint32_t x, uint32_t y, bool scaleToFit,
   return gProjectorWindow->createWindow(x, y, scaleToFit, refreshRate, error);
 }
 
-bool platform::displayProjectorFrame(shared_ptr<FrameWrapper> wrapper, uint64_t& timestamp,
-  uint32_t& delayMs, std::string& error)
+bool platform::displayVideoFrame(shared_ptr<FrameWrapper> wrapper, uint64_t& timestamp,
+  uint32_t& delayMs, string& error)
 {
-  return gProjectorWindow->displayFrame(wrapper, timestamp, delayMs, error);
+  return gProjectorWindow->displayVideoFrame(wrapper, timestamp, delayMs, error);
+}
+
+bool platform::displayCalibrationFrame(bool whiteFrame, uint64_t& timestamp, string& error)
+{
+  return gProjectorWindow->displayCalibrationFrame(whiteFrame, timestamp, error);
 }
 
 void platform::destroyProjectorWindow()

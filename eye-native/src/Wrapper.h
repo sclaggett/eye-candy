@@ -36,4 +36,7 @@ namespace wrapper
   Napi::String openPreviewChannel(const Napi::CallbackInfo& info);
   Napi::Value getNextFrame(const Napi::CallbackInfo& info);
   void closePreviewChannel(const Napi::CallbackInfo& info);
+
+  Napi::String beginCalibration(const Napi::CallbackInfo& info);
+  void endCalibration(const Napi::CallbackInfo& info);
 }

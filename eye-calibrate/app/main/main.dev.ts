@@ -12,30 +12,17 @@
  * Any log statements will be written to the terminal window.
  */
 
-import {
-  app,
-  BrowserWindow,
-  dialog,
-  nativeImage,
-  Rectangle,
-  screen,
-} from 'electron';
+import { app, BrowserWindow, screen } from 'electron';
 import path from 'path';
 import url from 'url';
-import ProjectorInfo from '../shared/ProjectorInfo';
-import StartRun from '../shared/StartRun';
 
-const { execFileSync } = require('child_process');
-const fs = require('fs');
 const { ipcMain } = require('electron');
+
 const eyeNative = require('eye-native');
 
-// Load the native library and remember the module root so we can pass it to the control
-// window when we set up the preview channel
-const eyeNativeModuleRoot = eyeNative.getModuleRoot();
+eyeNative.getModuleRoot();
 
 let controlWindow: BrowserWindow | null = null;
-const durationMs = 0;
 
 // Log segfault stack traces
 const SegfaultHandler = require('segfault-handler');
@@ -71,31 +58,39 @@ const installExtensions = async () => {
 };
 
 /**
- * The log() function passes the given string to the control window where it will be appended
- * to the log text area.
+ * The noSignalDetected() and averageLatency() functions are invoked repeatedly by the
+ * calibration thread as it attempts to measure the latency in the system. The results
+ * are passed to the control window for display.
  */
-function log(message: string) {
+function noSignalDetected() {
   if (controlWindow && controlWindow.webContents) {
-    controlWindow.webContents.send('log', message);
+    controlWindow.webContents.send('signalUpdate', false, 0);
+  }
+}
+
+function averageLatency(avgLatencyMs: number) {
+  if (controlWindow && controlWindow.webContents) {
+    controlWindow.webContents.send('signalUpdate', true, avgLatencyMs);
   }
 }
 
 /**
  * The runStopped() function cleans up any run in progress and notifies the control window.
  */
-function runStopped(message) {
-  // End video playback
-  const result = eyeNative.endVideoPlayback();
-  if (result !== '') {
-    log(`Error stopping run: ${result}\n`);
-  } else {
-    log(`${message}\n`);
-  }
-
-  // Notify the control window
+function runStopped() {
+  eyeNative.endCalibration();
   if (controlWindow && controlWindow.webContents) {
     controlWindow.webContents.send('runStopped');
   }
+}
+
+/**
+ * In the case of the calibration process, and log messages indicate and error. Display the
+ * error to the user and stop the run.
+ */
+function log(message: string) {
+  alert(message);
+  runStopped();
 }
 
 /**
@@ -167,90 +162,39 @@ app.on('ready', () => {
 });
 
 /**
- * The "startRun" IPC function is invoked when the user wants to begin playing back a
- * series of video files to the projector.
+ * The "startRun" IPC function is invoked when the user wants to begin calibrating
+ * the display system.
  */
-ipcMain.on('startRun', (_event, stringArg: string) => {
-  /*
-  // Deserialize the arguments
-  const args: StartRun = JSON.parse(stringArg) as StartRun;
-
-  // Check the executable path
-  log('Checking FFmpeg executable...\n');
-  try {
-    fs.accessSync(args.ffmpegPath, fs.constants.X_OK);
-  } catch (err) {
-    log(`Error: Failed to find executable at ${args.ffmpegPath}\n`);
-    return false;
+ipcMain.on('startRun', (_event) => {
+  // Detect displays and assume the secondary display is the projector
+  const displays = screen.getAllDisplays();
+  const projector = displays.find((display) => {
+    return display.bounds.x !== 0 || display.bounds.y !== 0;
+  });
+  if (!projector) {
+    alert('Projector not found');
+    return;
   }
 
-  // Check the FFmpeg version
-  log('Detecting FFmpeg version...\n');
-  let result: string = execFileSync(args.ffmpegPath, [
-    '-hide_banner',
-    '-version',
-  ]);
-  const lines = result.toString().split(/\r?\n/);
-  let version = '';
-  for (let i = 0; i < lines.length; i += 1) {
-    if (lines[i].includes('ffmpeg version')) {
-      const words = lines[i].split(' ');
-      const { 2: ver } = words;
-      version = ver;
-    }
-  }
-  if (version === '') {
-    log('Error: Failed to detect version\n');
-    return false;
-  }
-  log(`Detected version ${version}\n`);
-
-  // Calculate the location of ffprobe under the assumption that it is located in the
-  // same directory as ffmpeg
-  let ffprobeName;
-  if (process.platform === 'win32') {
-    ffprobeName = 'ffprobe.exe';
-  } else {
-    ffprobeName = 'ffprobe';
-  }
-  const ffprobePath = path.join(path.parse(args.ffmpegPath).dir, ffprobeName);
-
-  // Initialize the native library with the location of ffmpeg and the log callback
-  // and start playing back the list of video files
-  eyeNative.initialize(args.ffmpegPath, ffprobePath, log);
-  result = eyeNative.beginVideoPlayback(
-    args.projectorX,
-    args.projectorY,
-    args.videos,
-    args.scaleToFit,
-    playbackDuration,
-    playbackPosition,
-    playbackDelay
+  // Initialize the native library and start the calibration process
+  eyeNative.initialize('', '', log);
+  const result = eyeNative.beginCalibration(
+    projector.bounds.x + projector.bounds.width / 2,
+    projector.bounds.y + projector.bounds.height / 2,
+    noSignalDetected,
+    averageLatency
   );
   if (result !== '') {
-    log(`Error: ${result}\n`);
-    return false;
+    alert(result);
   }
-
-  // Create the preview channel and pass it and the module root to the control window
-  const channelName = eyeNative.createPreviewChannel();
-  if (controlWindow && controlWindow.webContents) {
-    controlWindow.webContents.send(
-      'runPreviewChannel',
-      eyeNativeModuleRoot,
-      channelName
-    );
-  }
-  */
-  return true;
 });
 
 /**
  * The "cancelRun" IPC function will be called by the control window when the user
- * wants to cancel the current run.
+ * wants to stop the current run.
  */
-ipcMain.on('cancelRun', (_event) => {
-  runStopped('Run terminated');
+ipcMain.on('stopRun', (_event) => {
+  runStopped();
 });
 
 /**

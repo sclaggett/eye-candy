@@ -141,6 +141,26 @@ function closePreviewChannel() {
   native.closePreviewChannel();
 }
 
+/**
+ * Use the functions in this section to calibrate the display system by measuring
+ * the number of milliseconds between a frame being passed to the swap chain and
+ * it actually being displayed by the projector.
+ */
+
+function beginCalibration(x, y, noSignalCallback, avgLatencyCallback) {
+  if (native === null) {
+    throw new Error('Native module has not been initialized');
+  }
+  return native.beginCalibration(x, y, noSignalCallback, avgLatencyCallback);
+}
+
+function endCalibration() {
+  if (native === null) {
+    throw new Error('Native module has not been initialized');
+  }
+  native.endCalibration();
+}
+
 module.exports = {
   getModuleRoot,
   setModuleRoot,
@@ -155,5 +175,7 @@ module.exports = {
   createPreviewChannel,
   openPreviewChannel,
   getNextFrame,
-  closePreviewChannel
+  closePreviewChannel,
+  beginCalibration,
+  endCalibration,
 };

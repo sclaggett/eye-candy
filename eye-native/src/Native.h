@@ -31,4 +31,8 @@ namespace native
   void closePreviewChannel(Napi::Env env);
 
   void deletePreviewFrame(napi_env env, void* finalize_data, void* finalize_hint);
+
+  std::string beginCalibration(Napi::Env env, int32_t x, int32_t y,
+    wrapper::JsCallback* noSignalJsCallback, wrapper::JsCallback* avgLatencyJsCallback);
+  void endCalibration(Napi::Env env);
 }
