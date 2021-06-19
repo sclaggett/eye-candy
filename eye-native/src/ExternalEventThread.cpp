@@ -30,7 +30,6 @@ uint32_t ExternalEventThread::run()
     {
       continue;
     }
-    //fprintf(stderr, "## Event %lli\n", eventTimestampUsec);
     {
       unique_lock<mutex> lock(timestampMutex);
       eventTimestamp = eventTimestampUsec;

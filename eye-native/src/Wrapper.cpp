@@ -67,16 +67,16 @@ void wrapper::invokeJsCallback(wrapper::JsCallback* callback, string result)
   }
 }
 
-void wrapper::invokeJsCallback(JsCallback* callback, uint32_t result)
+void wrapper::invokeJsCallback(JsCallback* callback, int32_t result)
 {
   auto helperFunction = [](Napi::Env env, Napi::Function jsCallback,
-    uint32_t* data)
+    int32_t* data)
   {
     jsCallback.Call({Napi::Number::New(env, *data)});
     delete data;
   };
 
-  uint32_t* intResult = new uint32_t();
+  int32_t* intResult = new int32_t();
   *intResult = result;
   napi_status status = callback->function.NonBlockingCall(intResult,
     helperFunction);

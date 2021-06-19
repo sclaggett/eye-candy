@@ -24,5 +24,5 @@ private:
   wrapper::JsCallback* errorCallback;
   wrapper::JsCallback* noSignalCallback;
   wrapper::JsCallback* avgLatencyCallback;
-  std::list<float> latencies;
+  std::list<double> latencies;
 };

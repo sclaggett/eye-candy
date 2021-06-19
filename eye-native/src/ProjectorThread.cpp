@@ -59,7 +59,7 @@ uint32_t ProjectorThread::run()
     // Display the frame on the projector. This function aligns with the monitor's
     // vsync signal and is the rate-limiting step in this thread
     uint64_t timestamp = 0;
-    uint32_t delayMs = 0;
+    int32_t delayMs = 0;
     if (!platform::displayVideoFrame(wrapper, timestamp, delayMs, error))
     {
       wrapper::invokeJsCallback(logCallback, "ERROR: Failed to display projector frame: " +

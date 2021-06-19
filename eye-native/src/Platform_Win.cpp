@@ -34,20 +34,16 @@ private:
   ComPtr<ID3D11DeviceContext> d3dContext;
   ComPtr<IDXGISwapChain> dxgiSwapChain;
   ComPtr<ID2D1Factory> d2dFactory;
-  ComPtr<ID3D11RenderTargetView> d3dRenderTargetView;
   ComPtr<ID2D1RenderTarget> d2dRenderTarget;
 
   // The playback position in milliseconds that we should be at if we haven't experienced
   // any frame starvation, i.e. if there are no delays between calls to displayFrame()
-  double targetPlaybackPosition = 0;
+  double targetPlaybackPositionMs;
 
-  // The time when the first frame was presented. This will be combined with the current time
-  // to detect if frame starvation has occurred by comparing to the target playback position
-  LARGE_INTEGER firstFrameTimestamp;
-
-  // Timing initialization and QFC frequency
-  bool timingInitialized = false;
-  LARGE_INTEGER qpcFrequency;
+  // The time when the first frame was presented in microseconds. This will be combined with
+  // the current time to detect if frame starvation has occurred by comparing to the target
+  // playback position
+  uint64_t firstFrameTimestampUsec;
 
 public:
   ProjectorWindow() {};
@@ -141,38 +137,15 @@ public:
     {
       dxgiSwapChain->SetFullscreenState(true, nullptr);
     }
+
+    // Reset the playback variables
+    targetPlaybackPositionMs = 0;
+    firstFrameTimestampUsec = 0;
     return true;
   }
 
   bool CreateResources()
   {
-    /* Is this necessary?
-    // Get buffer and create a render-target-view
-    ComPtr<ID3D11Resource> backBuffer;
-    if (FAILED(dxgiSwapChain->GetBuffer(0, __uuidof(ID3D11Resource), (LPVOID*)&backBuffer)))
-    {
-      fprintf(stderr, "[Platform_Win] ERROR: Failed to get back buffer\n");
-      return false;
-    }
-    HRESULT res = d3dDevice->CreateRenderTargetView(backBuffer.Get(), nullptr, &d3dRenderTargetView);
-    if (FAILED(res))
-    {
-      fprintf(stderr, "[Platform_Win] ERROR: Failed to create view\n");
-      return false;
-    }
-    d3dContext->OMSetRenderTargets(1, d3dRenderTargetView.GetAddressOf(), nullptr);
-
-    // Bind viewport
-    D3D11_VIEWPORT viewport;
-    viewport.Width = width;
-    viewport.Height = height;
-    viewport.MinDepth = 0.0f;
-    viewport.MaxDepth = 1.0f;
-    viewport.TopLeftX = 0;
-    viewport.TopLeftY = 0;
-    d3dContext->RSSetViewports(1, &viewport);
-    */
-
     // Get swap chain surface
     ComPtr<IDXGISurface> dxgiSurface;
     if (FAILED(dxgiSwapChain->GetBuffer(0, __uuidof(IDXGISurface), static_cast<void**>(&dxgiSurface))))
@@ -196,11 +169,10 @@ public:
   {
     // Release all outstanding references to the swap chain's buffers
     d3dContext->OMSetRenderTargets(0, 0, 0);
-    d3dRenderTargetView = nullptr;
     d2dRenderTarget = nullptr;
   }
 
-  bool displayVideoFrame(shared_ptr<FrameWrapper> frame, uint64_t& timestamp, uint32_t& delayMs, string& error)
+  bool displayVideoFrame(shared_ptr<FrameWrapper> frame, uint64_t& timestamp, int32_t& delayMs, string& error)
   {
     // Hack: Check the current refresh rate and blow up if it doesn't match our target. We shouldn't
     // have to do this--we should switch the projector to the correct refresh rate, preferrably during
@@ -292,36 +264,20 @@ public:
 
     /* Step 3: Calculate any culmulative delay in the video playback */
 
-    // Initialize timing
-    if (!timingInitialized)
-    {
-      QueryPerformanceFrequency(&qpcFrequency);
-      QueryPerformanceCounter(&firstFrameTimestamp);
-      timingInitialized = true;
-    }
-
     // Measure the actual playback position and use it to calculate any delay caused by
     // frame starvation
-    LARGE_INTEGER currentTime, actualPosition;
-    QueryPerformanceCounter(&currentTime);
-    actualPosition.QuadPart = currentTime.QuadPart - firstFrameTimestamp.QuadPart;
-    actualPosition.QuadPart *= 1000000;
-    actualPosition.QuadPart /= qpcFrequency.QuadPart;
-    double actualPlaybackPosition = (double)actualPosition.QuadPart / 1000;
-    if (actualPlaybackPosition > targetPlaybackPosition)
+    if (firstFrameTimestampUsec == 0)
     {
-      delayMs = (uint32_t)(actualPlaybackPosition - targetPlaybackPosition);
+      firstFrameTimestampUsec = timestamp;
     }
-    else
-    {
-      delayMs = 0;
-    }
+    double actualPlaybackPositionMs = (double)(timestamp - firstFrameTimestampUsec) / 1000;
+    delayMs = (int32_t)(actualPlaybackPositionMs - targetPlaybackPositionMs);
 
     // Update the target playback position, a value that won't actually be valid until the next
     // vertical sync
     if (frame->fps != 0)
     {
-      targetPlaybackPosition += 1000 / (double)frame->fps;
+      targetPlaybackPositionMs += 1000 / (double)frame->fps;
     }
 
     /* Step 4: Wait for additional vsync signals */
@@ -404,7 +360,6 @@ public:
       d3dContext->Flush();
       d3dContext = nullptr;
     }
-    d3dRenderTargetView = nullptr;
     d2dFactory = nullptr;
     d2dRenderTarget = nullptr;
     DestroyWindow();
@@ -849,7 +804,7 @@ bool platform::createProjectorWindow(uint32_t x, uint32_t y, bool scaleToFit,
 }
 
 bool platform::displayVideoFrame(shared_ptr<FrameWrapper> wrapper, uint64_t& timestamp,
-  uint32_t& delayMs, string& error)
+  int32_t& delayMs, string& error)
 {
   return gProjectorWindow->displayVideoFrame(wrapper, timestamp, delayMs, error);
 }
@@ -910,9 +865,9 @@ uint64_t platform::readTimestampUsec()
     fprintf(stderr, "[Platform_Win] ERROR: Timing card has not been initialized\n");
     return 0;
   }
-  unsigned int timelo = ParseBCD(*(volatile unsigned long*)(gJxiBase + Sec10_Usec1_Port));
-  unsigned int timehi = ParseBCD(*(volatile unsigned long*)(gJxiBase + Year1_Min1_Port));
-  return (((uint64_t)timehi) << 32) | timelo;
+  unsigned int time_usec = ParseBCD(*(volatile unsigned long*)(gJxiBase + Sec10_Usec1_Port));
+  unsigned int time_min = ParseBCD(*(volatile unsigned long*)(gJxiBase + Year1_Min1_Port));
+  return ((uint64_t)time_min * 60 * 1000 * 1000) + time_usec;
 }
 
 bool platform::startExternalEventDetection()
@@ -957,9 +912,9 @@ void platform::clearExternalEvent()
   unsigned char extstatus = *(volatile unsigned char*)(gJxiBase + Status_Port);
   if ((extstatus & Ext_Ready) != 0)
   {
-    unsigned int exttimelo = *(volatile unsigned long*)(gJxiBase + Ext_Sec10_Usec1_Port);
-    unsigned int exttimehi = *(volatile unsigned long*)(gJxiBase + Ext_Year1_Min1_Port);
-    unsigned char exttime100ns = *(volatile unsigned char*)(gJxiBase + Ext_100ns_Port);
+    unsigned int exttime_usec = *(volatile unsigned long*)(gJxiBase + Ext_Sec10_Usec1_Port);
+    unsigned int exttime_min = *(volatile unsigned long*)(gJxiBase + Ext_Year1_Min1_Port);
+    unsigned char exttime_100ns = *(volatile unsigned char*)(gJxiBase + Ext_100ns_Port);
   }
 }
 
@@ -995,9 +950,9 @@ bool platform::waitForExternalEvent(uint32_t timeoutMs, uint64_t& eventTimestamp
   {
     return false;
   }
-  unsigned int timelo = ParseBCD(*(volatile unsigned long*)(gJxiBase + Ext_Sec10_Usec1_Port));
-  unsigned int timehi = ParseBCD(*(volatile unsigned long*)(gJxiBase + Ext_Year1_Min1_Port));
-  eventTimestampUs = (((uint64_t)timehi) << 32) | timelo;
+  unsigned int exttime_usec = ParseBCD(*(volatile unsigned long*)(gJxiBase + Ext_Sec10_Usec1_Port));
+  unsigned int exttime_min = ParseBCD(*(volatile unsigned long*)(gJxiBase + Ext_Year1_Min1_Port));
+  eventTimestampUs = ((uint64_t)exttime_min * 60 * 1000 * 1000) + exttime_usec;
   return true;
 }
 

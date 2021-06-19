@@ -604,9 +604,12 @@ export default class Control extends React.Component<
     let progressTotal = '';
     if (this.state.running) {
       progressElapsed = this.formatDuration(this.state.runElapsedMs);
-      if (this.state.runDelayMs > 10) {
+      if (Math.abs(this.state.runDelayMs) > 10) {
         showProgressDelay = true;
-        progressDelay = (this.state.runDelayMs / 1000).toFixed(2);
+        if (this.state.runDelayMs > 10) {
+          progressDelay = '+';
+        }
+        progressDelay += (this.state.runDelayMs / 1000).toFixed(2);
       }
       progressTotal = this.formatDuration(this.state.runTotalMs);
     }
@@ -714,7 +717,7 @@ export default class Control extends React.Component<
                 className={styles.progressTextDelay}
                 style={showProgressDelay ? {} : { display: 'none' }}
               >
-                {`+${progressDelay}`}
+                {`${progressDelay}`}
               </div>
               <div>{`/${progressTotal}`}</div>
             </div>

@@ -117,7 +117,7 @@ void CalibrationThread::addLatencyMeasurement(uint64_t latencyUsec)
 {
   // Add this latency to our list and throw away old values if we've exceeded the maximum number
   // of measurements we want to consider
-  latencies.push_back((float)latencyUsec / 1000);
+  latencies.push_back((double)latencyUsec / 1000);
   while (latencies.size() >= MAX_LATENCY_COUNT)
   {
     latencies.pop_front();
@@ -130,24 +130,24 @@ void CalibrationThread::addLatencyMeasurement(uint64_t latencyUsec)
   }
 
   // Calculate the average and standard deviation of the measurements
-  float sum = 0;
+  double sum = 0;
   for (auto it = latencies.begin(); it != latencies.end(); ++it)
   {
     sum += *it;
   }
-  float mean = sum / latencies.size();
-  float variance = 0;
+  double mean = sum / latencies.size();
+  double variance = 0;
   for (auto it = latencies.begin(); it != latencies.end(); ++it)
   {
     variance += pow(*it - mean, 2);
   }
-  float stdDev = sqrt(variance / latencies.size());
+  double stdDev = sqrt(variance / latencies.size());
   char message[1024];
-  if (stdDev > 1)
+  if (stdDev > 2)
   {
     sprintf(message, "%i +/- %i ms\n", (int32_t)mean, (int32_t)stdDev);
   }
-  else if (stdDev > 0.1)
+  else if (stdDev > 0.2)
   {
     sprintf(message, "%0.1f +/- %0.1f ms\n", mean, stdDev);
   }
