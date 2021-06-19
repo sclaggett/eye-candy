@@ -15,7 +15,7 @@ type ControlState = {
   // average latency in millseconds
   running: boolean;
   signalDetected: boolean;
-  avgLatencyMs: number;
+  avgLatency: string | null;
 };
 
 export default class Control extends React.Component<
@@ -29,7 +29,7 @@ export default class Control extends React.Component<
     this.state = {
       running: false,
       signalDetected: false,
-      avgLatencyMs: 0,
+      avgLatency: null,
     };
 
     // Bind the IPC handlers and other callbacks so "this" will be defined when
@@ -66,11 +66,11 @@ export default class Control extends React.Component<
   onSignalUpdate(
     _event: IpcRendererEvent,
     signalDetected: boolean,
-    avgLatencyMs: number
+    avgLatency: string
   ) {
     this.setState({
       signalDetected,
-      avgLatencyMs,
+      avgLatency,
     });
   }
 
@@ -98,7 +98,7 @@ export default class Control extends React.Component<
       statusText = 'No signal detected';
       statusStyle = styles.statusNoSignal;
     } else {
-      statusText = `Average latency: ${this.state.avgLatencyMs} ms`;
+      statusText = this.state.avgLatency;
       statusStyle = styles.statusSignal;
     }
 

@@ -64,13 +64,13 @@ const installExtensions = async () => {
  */
 function noSignalDetected() {
   if (controlWindow && controlWindow.webContents) {
-    controlWindow.webContents.send('signalUpdate', false, 0);
+    controlWindow.webContents.send('signalUpdate', false, null);
   }
 }
 
-function averageLatency(avgLatencyMs: number) {
+function averageLatency(avgLatency: string) {
   if (controlWindow && controlWindow.webContents) {
-    controlWindow.webContents.send('signalUpdate', true, avgLatencyMs);
+    controlWindow.webContents.send('signalUpdate', true, avgLatency);
   }
 }
 

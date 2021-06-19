@@ -346,7 +346,6 @@ public:
     return true;
   }
 
-  uint64_t lastTimestamp = 0;
   bool displayCalibrationFrame(bool whiteFrame, uint64_t& timestamp, string& error)
   {    
     /* Step 1: Paint the background of the back buffer */
@@ -367,32 +366,9 @@ public:
       return false;
     }
 
-    /* Step 2: Wait for vsync */
+    /* Step 2: Present the frame */
 
-    // Waiting for vsync before calling Present(1) causes the latter to happen quickly but I don't
-    // see much advantage to this approach--we can skip the vsync wait and just call Present(1), which
-    // causes it to take care of the vsync detection.
-    /*
-    // Pause for the vsync signal
-    ComPtr<IDXGIOutput> output;
-    if (FAILED(dxgiSwapChain->GetContainingOutput(&output)))
-    {
-      error = "Failed to get containing output";
-      return false;
-    }
-    if (FAILED(output->WaitForVBlank()))
-    {
-      error = "Failed to wait for vsync";
-      return false;
-    }
-    */
-
-    /* Step 3: Present the frame */
-
-    uint64_t beforePresentTs = platform::readTimestampUsec();
-    //timestamp = beforePresentTs;
-
-    // Present the frame
+    // Wait until the next vsync and present the frame
     HRESULT hr = dxgiSwapChain->Present(1, 0);
     if (FAILED(hr))
     {
@@ -406,15 +382,6 @@ public:
 
     // Make a note of the timestamp
     timestamp = platform::readTimestampUsec();
-
-    uint64_t afterPresentTs = timestamp;
-    uint64_t presentTime = afterPresentTs - beforePresentTs;
-    uint64_t timeOutside = beforePresentTs - lastTimestamp;
-    uint64_t cycleTime = afterPresentTs - lastTimestamp;
-    lastTimestamp = afterPresentTs;
-    //fprintf(stderr, "Present %0.2f, outside %0.2f, cycle %0.2f\n", (float)presentTime / 1000,
-    //  (float)timeOutside / 1000, (float)cycleTime / 1000);
-
     return true;
   }
 

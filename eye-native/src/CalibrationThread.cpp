@@ -1,12 +1,15 @@
 #include "CalibrationThread.h"
 #include "ExternalEventThread.h"
 #include "Platform.h"
+#include <cmath>
+
+#define MIN_LATENCY_COUNT 5
+#define MAX_LATENCY_COUNT 10
 
 using namespace std;
 
-CalibrationThread::CalibrationThread(uint32_t x1, uint32_t y1,
-    wrapper::JsCallback* error, wrapper::JsCallback* noSignal,
-    wrapper::JsCallback* avgLatency) :
+CalibrationThread::CalibrationThread(uint32_t x1, uint32_t y1, wrapper::JsCallback* error,
+    wrapper::JsCallback* noSignal, wrapper::JsCallback* avgLatency) :
   Thread("calibration"),
   x(x1),
   y(y1),
@@ -51,8 +54,7 @@ uint32_t CalibrationThread::run()
     uint64_t eventTimestamp = externalEventThread->getEventTimestamp();
     if ((eventTimestamp != 0) && (whiteFrameTimestamp != 0) && (eventTimestamp > whiteFrameTimestamp))
     {
-      uint32_t deltaMs = (uint32_t)((eventTimestamp - whiteFrameTimestamp) / 1000);
-      fprintf(stderr, "## Delta = %i ms\n", deltaMs);
+      addLatencyMeasurement(eventTimestamp - whiteFrameTimestamp);
       whiteFrameTimestamp = 0;
     }
 
@@ -72,13 +74,22 @@ uint32_t CalibrationThread::run()
       break;
     }
 
-    // Remember the timestamp if this is the first white frame and increment the count
+    // Check if this is the first white frame after a period of darkness. If so, check if a
+    // signal was detected in the last cycle, clear the external event, remember the timestamp,
+    // and notify the UI if no signal was detected
     if (firstWhiteFrame)
     {
+      bool signalDetected = (whiteFrameTimestamp == 0);
       platform::clearExternalEvent();
       whiteFrameTimestamp = timestamp;
-      //fprintf(stderr, "## White frame %lli\n", whiteFrameTimestamp);
+      if (!signalDetected)
+      {
+        wrapper::invokeJsCallback(noSignalCallback);
+        latencies.clear();
+      }
     }
+
+    // Increment the count and roll over at 12
     count += 1;
     if (count == 12)
     {
@@ -100,4 +111,49 @@ bool CalibrationThread::terminate(uint32_t timeout /*= 100*/)
   // It can take longer than 100 ms for the calibration thread to shut down so
   // wait for up to a full second
   return Thread::terminate(1000);
+}
+
+void CalibrationThread::addLatencyMeasurement(uint64_t latencyUsec)
+{
+  // Add this latency to our list and throw away old values if we've exceeded the maximum number
+  // of measurements we want to consider
+  latencies.push_back((float)latencyUsec / 1000);
+  while (latencies.size() >= MAX_LATENCY_COUNT)
+  {
+    latencies.pop_front();
+  }
+
+  // Bail without doing anything if we haven't reached the minimum number of measurements
+  if (latencies.size() < MIN_LATENCY_COUNT)
+  {
+    return;
+  }
+
+  // Calculate the average and standard deviation of the measurements
+  float sum = 0;
+  for (auto it = latencies.begin(); it != latencies.end(); ++it)
+  {
+    sum += *it;
+  }
+  float mean = sum / latencies.size();
+  float variance = 0;
+  for (auto it = latencies.begin(); it != latencies.end(); ++it)
+  {
+    variance += pow(*it - mean, 2);
+  }
+  float stdDev = sqrt(variance / latencies.size());
+  char message[1024];
+  if (stdDev > 1)
+  {
+    sprintf(message, "%i +/- %i ms\n", (int32_t)mean, (int32_t)stdDev);
+  }
+  else if (stdDev > 0.1)
+  {
+    sprintf(message, "%0.1f +/- %0.1f ms\n", mean, stdDev);
+  }
+  else
+  {
+    sprintf(message, "%0.2f +/- %0.2f ms\n", mean, stdDev);
+  }
+  wrapper::invokeJsCallback(avgLatencyCallback, message);
 }
