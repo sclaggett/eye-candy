@@ -50,3 +50,52 @@ jobs:
           yarn lint
           yarn tsc
         working-directory: ./eye-candy
+
+      - name: Install eye-projector
+        run: |
+          yarn install --frozen-lockfile
+        working-directory: ./eye-projector
+
+      - name: Copy jxi eye-projector
+        run: |
+          Copy-Item -Path "..\eye-candy-jxi" -Destination "app\node_modules" -Recurse
+        working-directory: ./eye-projector
+
+      - name: Build eye-projector
+        run: |
+          yarn electron-rebuild
+        working-directory: ./eye-projector
+
+      - name: Package eye-projector
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          yarn package-ci
+          yarn lint
+          yarn tsc
+        working-directory: ./eye-projector
+
+      - name: Install eye-measure
+        run: |
+          yarn install --frozen-lockfile
+        working-directory: ./eye-measure
+
+      - name: Copy jxi eye-measure
+        run: |
+          Copy-Item -Path "..\eye-candy-jxi" -Destination "app\node_modules" -Recurse
+        working-directory: ./eye-measure
+
+      - name: Build eye-measure
+        run: |
+          yarn electron-rebuild
+        working-directory: ./eye-measure
+
+      - name: Package eye-measure
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          yarn package-ci
+          yarn lint
+          yarn tsc
+        working-directory: ./eye-measure
+        
