@@ -229,7 +229,7 @@ export default class Control extends React.Component<
   onNumberInputChange(event: React.ChangeEvent<HTMLInputElement>) {
     if (event.target && event.target.name && event.target.value) {
       this.setState(({
-        [event.target.name]: parseInt(event.target.value, 0),
+        [event.target.name]: parseInt(event.target.value, 10),
       } as unknown) as ControlState);
     }
   }

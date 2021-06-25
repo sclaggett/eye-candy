@@ -47,8 +47,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           yarn package-ci
-          yarn lint
-          yarn tsc
         working-directory: ./eye-candy
 
       - name: Install eye-projector
@@ -71,8 +69,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           yarn package-ci
-          yarn lint
-          yarn tsc
         working-directory: ./eye-projector
 
       - name: Install eye-measure
@@ -95,7 +91,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           yarn package-ci
-          yarn lint
-          yarn tsc
         working-directory: ./eye-measure
-        
