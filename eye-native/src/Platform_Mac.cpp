@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <mach/mach_time.h>
 
 using namespace std;
 
@@ -259,22 +260,75 @@ void platform::close(uint64_t file)
   ::close((int)file);
 }
 
-// The monitor functions are dummy implementations on Mac
+// All remaining platform functions use dummy implementations on Mac
 vector<uint32_t> platform::getDisplayFrequencies(int32_t x, int32_t y)
 {
   vector<uint32_t> dummy;
+  dummy.push_back(50);
+  dummy.push_back(60);
   return dummy;
 }
-bool platform::createProjectorWindow(uint32_t x, uint32_t y, uint32_t refreshRate)
+
+bool platform::createProjectorWindow(uint32_t x, uint32_t y, bool scaleToFit,
+  uint32_t refreshRate, string& error)
 {
   return true;
 }
-bool platform::displayProjectorFrame(std::shared_ptr<FrameWrapper> wrapper)
+bool platform::displayVideoFrame(shared_ptr<FrameWrapper> wrapper, uint64_t& timestamp,
+  int32_t& delayMs, string& error)
 {
   uint32_t sleepMs = (uint32_t)(1000.0 / wrapper->fps);
   platform::sleep(sleepMs);
   return true;
 }
+
+bool platform::displayCalibrationFrame(bool whiteFrame, uint64_t& timestamp,
+  string& error)
+{
+  platform::sleep(33);
+  return true;
+}
+
 void platform::destroyProjectorWindow()
+{
+}
+
+bool platform::initializeTimingCard()
+{
+  return true;
+}
+
+bool timeBaseInitialized = false;
+mach_timebase_info_data_t timeBase;
+uint64_t platform::readTimestampUsec()
+{
+  if (!timeBaseInitialized)
+  {
+    mach_timebase_info(&timeBase);
+    timeBaseInitialized = true;
+  }
+  uint64_t machTime = mach_absolute_time();
+  return (machTime * timeBase.numer / timeBase.denom / 1000);
+}
+
+bool platform::startExternalEventDetection()
+{
+  return true;
+}
+
+void platform::clearExternalEvent()
+{
+}
+
+bool platform::waitForExternalEvent(uint32_t timeoutMs, uint64_t& eventTimestampUsec)
+{
+  return false;
+}
+
+void platform::stopExternalEventDetection()
+{
+}
+
+void platform::releaseTimingCard()
 {
 }

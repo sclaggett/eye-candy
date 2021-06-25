@@ -60,7 +60,6 @@ uint32_t PlaybackThread::run()
   vector<pair<uint32_t, uint32_t>> videoDimensions;
   vector<uint32_t> videoFps;
   vector<uint32_t> videoLengths;
-  uint32_t totalFrameCount = 0;
   double totalDurationMs = 0;
   for (uint32_t i = 0; i < videos.size(); ++i)
   {

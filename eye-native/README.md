@@ -1,8 +1,10 @@
 # eye-native
 
-This is the native library for the *eye-candy* and *eye-projector* projects.
+This is the native library for the *eye-X* projects.
 
-You do not need to build this project separately unless you're working directly on the native code. When building the *eye-candy* and *eye-projector* projects, the contents of this project will be copied into their `node_modules` directories and built there,
+On Windows, you will need to build this project prior to building any of the other projects. The other projects reference this one through a symlink.
+
+On Mac, you do *not* need to build this project unless you're working directly on the native code. The other projects will create a copy of this project in their `node_modules` directories and will build is there as part of their process.
 
 Local development is initialized by running `yarn install` and built by running `yarn build`.
 
@@ -47,7 +49,9 @@ $ cp -R install/include/opencv4/* [$/opencv/mac/include/]
 
 ## Native development
 
-You can shorten your iteration time when developing this library in the context of e.g. eye-candy as follows:
+On Windows, build this project first and then run one of the projects that uses it in development mode.
+
+On Mac, you can shorten your iteration time when developing this library in the context of one of the projects that uses it as follows:
 
 1. Make your changes in eye-native and run `yarn build` to confirm they compile.
 2. Force eye-candy to pick up the changes by running the following commands:
@@ -59,7 +63,7 @@ $ yarn dev
 
 ## Windows development
 
-Development for Windows was done using a VM on AWS. Do the following to set up the build environment:
+Initial development for Windows was done using a VM on AWS. Do the following to set up the build environment:
 
 1. Provision a new *Microsoft Windows Server 2019 Base* VM on AWS. Spring for a medium-sized VM or you may as well compile by hand.
 2. Connect to the VM over RDP.

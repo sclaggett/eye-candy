@@ -17,9 +17,9 @@ public:
 
   void setPreviewChannel(std::string channelName);
 
-  uint32_t run();
+  uint32_t run() override;
 
-  bool terminate(uint32_t timeout = 100);
+  bool terminate(uint32_t timeout = 100) override;
 
 private:
   std::string formatDuration(uint32_t duration);

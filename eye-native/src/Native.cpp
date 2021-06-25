@@ -79,7 +79,7 @@ int32_t native::queueNextFrame(Napi::Env env, uint8_t* frame, size_t length, int
   wrapper->electronLength = length;
   wrapper->electronWidth = width;
   wrapper->electronHeight = height;
-  if ((width != gWidth) || (height != gHeight))
+  if ((width != (int)gWidth) || (height != (int)gHeight))
   {
     Mat fullFrame(height, width, CV_8UC4, frame);
     Mat resizedFrame;

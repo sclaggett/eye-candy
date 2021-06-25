@@ -16,7 +16,7 @@ public:
     wrapper::JsCallback* delayCallback);
   virtual ~ProjectorThread() {};
 
-  uint32_t run();
+  uint32_t run() override;
 
   bool terminate(uint32_t timeout = 100) override;
 

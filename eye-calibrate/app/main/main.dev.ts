@@ -16,7 +16,7 @@ import { app, BrowserWindow, screen } from 'electron';
 import path from 'path';
 import url from 'url';
 
-const { ipcMain } = require('electron');
+const { ipcMain, dialog } = require('electron');
 
 const eyeNative = require('eye-native');
 
@@ -89,7 +89,10 @@ function runStopped() {
  * error to the user and stop the run.
  */
 function log(message: string) {
-  alert(message);
+  dialog.showMessageBox({
+    type: 'error',
+    message,
+  });
   runStopped();
 }
 
@@ -172,7 +175,11 @@ ipcMain.on('startRun', (_event) => {
     return display.bounds.x !== 0 || display.bounds.y !== 0;
   });
   if (!projector) {
-    alert('Projector not found');
+    dialog.showMessageBox({
+      type: 'error',
+      message: 'Projector not found.',
+    });
+    runStopped();
     return;
   }
 
@@ -185,7 +192,11 @@ ipcMain.on('startRun', (_event) => {
     averageLatency
   );
   if (result !== '') {
-    alert(result);
+    dialog.showMessageBox({
+      type: 'error',
+      message: result,
+    });
+    runStopped();
   }
 });
 
