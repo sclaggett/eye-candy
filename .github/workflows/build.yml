@@ -34,12 +34,7 @@ jobs:
 
       - name: Copy jxi eye-candy
         run: |
-          ls -la .
-          ls -la ./app/
-          ls -la ./app/node_modules
-          ls -la ../eye-candy-jx
-          cp -R ../eye-candy-jxi ./app/node_modules
-          ls -la ./app/node_modules
+          Get-ChildItem .
         working-directory: ./eye-candy
 
       - name: Build eye-candy
