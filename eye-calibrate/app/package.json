@@ -1,6 +1,6 @@
 {
   "name": "eye-calibrate",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Eye Calibrate latency detection",
   "main": "./main/main.prod.js",
   "author": {

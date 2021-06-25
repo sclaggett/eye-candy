@@ -1,6 +1,6 @@
 {
   "name": "eye-projector",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Eye Projector stimulus playback",
   "main": "./main/main.prod.js",
   "author": {
