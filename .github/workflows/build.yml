@@ -32,12 +32,17 @@ jobs:
           yarn install --frozen-lockfile
         working-directory: ./eye-candy
 
-      - name: yarn electron-rebuild
+      - name: yarn copy submodules eye-candy
+        run: |
+          copy ../eye-candy-jxi ./app/node_modules
+        working-directory: ./eye-candy
+
+      - name: yarn rebuild eye-candy
         run: |
           yarn electron-rebuild
         working-directory: ./eye-candy
 
-      - name: yarn package
+      - name: yarn package eye-candy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
