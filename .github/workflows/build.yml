@@ -34,7 +34,7 @@ jobs:
 
       - name: Copy jxi eye-candy
         run: |
-          Get-ChildItem .
+          Copy-Item -Path "..\eye-candy-jxi" -Destination "app\node_modules" -Recurse
         working-directory: ./eye-candy
 
       - name: Build eye-candy
