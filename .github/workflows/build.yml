@@ -22,27 +22,27 @@ jobs:
         with:
           node-version: 14
 
-      - name: yarn install eye-native
-        run: |
-          yarn install --frozen-lockfile
-        working-directory: ./eye-native
-
-      - name: yarn install eye-candy
+      - name: Install eye-candy
         run: |
           yarn install --frozen-lockfile
         working-directory: ./eye-candy
 
-      - name: yarn copy submodules eye-candy
+      - name: Copy jxi eye-candy
         run: |
-          copy ../eye-candy-jxi ./app/node_modules
+          ls -la .
+          ls -la ./app/
+          ls -la ./app/node_modules
+          ls -la ../eye-candy-jx
+          cp -R ../eye-candy-jxi ./app/node_modules
+          ls -la ./app/node_modules
         working-directory: ./eye-candy
 
-      - name: yarn rebuild eye-candy
+      - name: Build eye-candy
         run: |
           yarn electron-rebuild
         working-directory: ./eye-candy
 
-      - name: yarn package eye-candy
+      - name: Package eye-candy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
