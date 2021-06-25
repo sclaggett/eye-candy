@@ -71,24 +71,24 @@ jobs:
           yarn package-ci
         working-directory: ./eye-projector
 
-      - name: Install eye-measure
+      - name: Install eye-calibrate
         run: |
           yarn install --frozen-lockfile
-        working-directory: ./eye-measure
+        working-directory: ./eye-calibrate
 
-      - name: Copy jxi eye-measure
+      - name: Copy jxi eye-calibrate
         run: |
           Copy-Item -Path "..\eye-candy-jxi" -Destination "app\node_modules" -Recurse
-        working-directory: ./eye-measure
+        working-directory: ./eye-calibrate
 
-      - name: Build eye-measure
+      - name: Build eye-calibrate
         run: |
           yarn electron-rebuild
-        working-directory: ./eye-measure
+        working-directory: ./eye-calibrate
 
-      - name: Package eye-measure
+      - name: Package eye-calibrate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           yarn package-ci
-        working-directory: ./eye-measure
+        working-directory: ./eye-calibrate
